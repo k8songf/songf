@@ -63,6 +63,10 @@ type JobStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	// +optional
+	State JobState `json:"state,omitempty" protobuf:"bytes,1,opt,name=state"`
+
+	ItemStatus map[string]ItemStatus
 }
 
 type Item struct {
@@ -72,18 +76,25 @@ type Item struct {
 
 	RunAfter []string
 
+	TotalDeleteWhileFail *bool
+
 	ItemJobResource
 
-	ModuleResource
+	ItemModuleResource
 }
 
 type ItemJobResource struct {
-	ContainerExtend string
-	K8sJobs         []ItemJobTemplate
+	ContainerExtend *string
+
+	TotalDeleteWhileFail *bool
+
+	Jobs []ItemJobTemplate
 }
 
-type ModuleResource struct {
+type ItemModuleResource struct {
 	CleanUp bool
+
+	TotalDeleteWhileFail *bool
 
 	Services []ServiceTemplate
 
@@ -98,18 +109,18 @@ type ItemJobTemplate struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	ContainerExtend string
+	ContainerExtend *string
 
-	NodeNameExtend string
+	NodeNameExtend *string
 
 	// Specification of the desired behavior of the job.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
-	K8sJobSpec batchv1.JobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	K8sJobSpec *batchv1.JobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Specification of the desired behavior of the volcano job, including the minAvailable
 	// +optional
-	VolcanoJobSpec v1alpha1.JobSpec `json:"spec,omitempty" protobuf:"bytes,3,opt,name=spec"`
+	VolcanoJobSpec *v1alpha1.JobSpec `json:"spec,omitempty" protobuf:"bytes,3,opt,name=spec"`
 }
 
 type ServiceTemplate struct {
@@ -135,6 +146,84 @@ type SecretTemplate struct {
 	Secret corev1.Secret
 }
 
+// JobPhase defines the phase of the job.
+type JobPhase string
+
+const (
+	Unknown     JobPhase = "Unknown"
+	Scheduled   JobPhase = "Scheduled"
+	Completed   JobPhase = "Completed"
+	Failed      JobPhase = "Failed"
+	Completing  JobPhase = "Completing"
+	Terminating JobPhase = "Terminating"
+	Terminated  JobPhase = "Terminated"
+)
+
+type JobState struct {
+	// The phase of Job.
+	// +optional
+	Phase JobPhase `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase"`
+
+	// Unique, one-word, CamelCase reason for the phase's last transition.
+	// +optional
+	Reason string `json:"reason,omitempty" protobuf:"bytes,2,opt,name=reason"`
+
+	// Human-readable message indicating details about last transition.
+	// +optional
+	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
+
+	// Last time the condition transit from one phase to another.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
+}
+
+// JobPhase defines the phase of the job.
+type ItemPhase string
+
+const (
+	ItemPending   RegularModulePhase = "Unknown"
+	ItemScheduled RegularModulePhase = "Scheduled"
+	ItemCompleted RegularModulePhase = "Completed"
+	ItemFailed    RegularModulePhase = "Failed"
+)
+
+type ItemStatus struct {
+	Name string
+
+	Phase ItemPhase
+
+	RunningJobNum *int32
+
+	CompletedJobNum *int32
+
+	FailedJobNum *int32
+
+	K8sJobStatus map[string]v1alpha1.JobState
+
+	VolcanoJobStatus map[string]v1alpha1.JobState
+
+	ServiceStatus map[string]RegularModuleStatus
+
+	ConfigMapStatus map[string]RegularModuleStatus
+
+	SecretStatus map[string]RegularModuleStatus
+}
+
+// JobPhase defines the phase of the job.
+type RegularModulePhase string
+
+const (
+	RegularModuleUnknown  RegularModulePhase = "Unknown"
+	RegularModuleCreating RegularModulePhase = "Creating"
+	RegularModuleCreated  RegularModulePhase = "Created"
+	RegularModuleFailed   RegularModulePhase = "Failed"
+)
+
+type RegularModuleStatus struct {
+	Phase              RegularModulePhase
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
+}
+
 type JobTemplateSpec struct {
 
 	//+optional
@@ -148,8 +237,10 @@ type JobTemplateSpec struct {
 // JobList contains a list of Job
 type JobList struct {
 	metav1.TypeMeta `json:",inline"`
+
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Job `json:"items"`
+
+	Items []Job `json:"items"`
 }
 
 func init() {
