@@ -1,5 +1,5 @@
 # songf
-// TODO(user): Add simple overview of use/purpose
+This is a k8s component for scheduling various job resources, including native job, volcano job, configmap, service, etc., as well as providing various scheduling policies to achieve more intelligent task flow.
 
 ## Description
 // TODO(user): An in-depth paragraph about your project and overview of use
