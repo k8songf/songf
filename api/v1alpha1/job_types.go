@@ -37,113 +37,195 @@ type Job struct {
 	metav1.TypeMeta `json:",inline"`
 
 	//+optional
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Specification of the desired behavior of the songf job
 	// +optional
-	Spec JobSpec `json:"spec,omitempty"`
+	Spec JobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Current status of the songf Job
 	// +optional
-	Status JobStatus `json:"status,omitempty"`
+	Status JobStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=spec"`
 }
 
 // JobSpec defines the desired state of Job
 type JobSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
 
-	Items []Item `json:"items,omitempty"`
+	// Items defines the specific step flow of the task, and based on this field,
+	// a directed acyclic graph can be constructed to describe the task flow
+	// +optional
+	Items []Item `json:"items,omitempty" protobuf:"bytes,1,opt,name=items"`
 
-	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,8,opt,name=ttlSecondsAfterFinished"`
+	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
+	// execution (either Completed or Failed). If this field is set,
+	// ttlSecondsAfterFinished after the Job finishes, components in all items will be
+	// automatically deleted. If this field is unset,
+	// the Job won't be automatically deleted. If this field is set to zero,
+	// the Job becomes eligible to be deleted immediately after it finishes.
+	// +optional
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,2,opt,name=ttlSecondsAfterFinished"`
 }
 
 // JobStatus defines the observed state of Job
 type JobStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
+	// Current state of Job.
 	// +optional
 	State JobState `json:"state,omitempty" protobuf:"bytes,1,opt,name=state"`
 
-	ItemStatus map[string]ItemStatus
+	// Current state of each open Item, including jobs and modules.
+	// +optional
+	ItemStatus map[string]ItemStatus `json:"itemStatus,omitempty" protobuf:"bytes,2,opt,name=itemStatus"`
 }
 
+// Item defines the specific execution process of Job
 type Item struct {
-	Name string
 
-	Truncated bool
+	// The name of Item, must be Unique in all Items.
+	// Can not set null.
+	// +optional
+	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 
-	RunAfter []string
+	// Default to false.
+	// If set true, this Item and its child Items won't participate in the scheduling of taskflow
+	// +optional
+	Truncated bool `json:"truncated,omitempty" protobuf:"varint,2,opt,name=truncated"`
 
-	TotalDeleteWhileFail *bool
+	// RunAfter defines the timing of this Item can be scheduled.
+	// When Items with name set in this field Success, this Item will start to run.
+	// If set null, this Item will be the first one. Only one Item can set this field null.
+	// +optional
+	RunAfter []string `json:"runAfter,omitempty" protobuf:"bytes,3,opt,name=runAfter"`
 
-	ItemJobResource
+	// ItemJobs defines the jobs scheduled in this Item, including volcano job and k8s job.
+	// +optional
+	ItemJobs ItemJobResource `json:"itemJobs,omitempty" protobuf:"bytes,4,opt,name=ItemJobs"`
 
-	ItemModuleResource
+	// ItemModules defines the modules in this Item, including service, configmap and secret.
+	// +optional
+	ItemModules ItemModuleResource `json:"itemModules,omitempty" protobuf:"bytes,5,opt,name=itemModules"`
 }
 
+// ItemJobResource defines the jobs to create in Item
 type ItemJobResource struct {
-	ContainerExtend *string
 
-	TotalDeleteWhileFail *bool
+	// If set, the container of all item jobs will be replaced by the field.
+	// For example, set this filed "a->b", it means the jobs containers will be replaced by Job with
+	// name "b" that in Item with name "a".
+	// +optional
+	ContainerExtend *string `json:"containerExtend,omitempty" protobuf:"bytes,1,opt,name=containerExtend"`
 
-	Jobs []ItemJobTemplate
+	// Jobs to create
+	// +optional
+	Jobs []ItemJobTemplate `json:"jobs,omitempty" protobuf:"bytes,2,opt,name=jobs"`
 }
 
+// ItemModuleResource defines the modules to create in Item
 type ItemModuleResource struct {
-	CleanUp bool
 
-	TotalDeleteWhileFail *bool
+	// ttlSecondsAfterFinished limits the lifetime of item modules that Item finished
+	// execution (either Completed or Failed). If this field is set,
+	// ttlSecondsAfterFinished after the Item finishes, modules in all items will be
+	// automatically deleted. If this field is unset,
+	// the modules won't be automatically deleted. If this field is set to zero,
+	// the modules becomes eligible to be deleted immediately after it finishes.
+	// +optional
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,1,opt,name=ttlSecondsAfterFinished"`
 
-	Services []ServiceTemplate
+	// services to create, names can not be repeated
+	// +optional
+	Services []ServiceTemplate `json:"services,omitempty" protobuf:"bytes,2,opt,name=services"`
 
-	ConfigMap []ConfigMapTemplate
+	// configmaps to create, names can not be repeated
+	// +optional
+	ConfigMaps []ConfigMapTemplate `json:"configMaps,omitempty" protobuf:"bytes,3,opt,name=configMaps"`
 
-	Secret []corev1.Secret
+	// secrets to create, names can not be repeated
+	// +optional
+	Secrets []SecretTemplate `json:"secrets,omitempty" protobuf:"bytes,4,opt,name=secrets"`
 }
 
+// ItemJobTemplate defines the jobs to create in Item, detailed information. K8sJobSpec and VolcanoJobSpec only one exist.
 type ItemJobTemplate struct {
 	// Standard object's metadata of the jobs created from this template.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	ContainerExtend *string
+	// If set, the container of the job will be replaced by the field.
+	// For example, set this filed "a->b", it means the job's container will be replaced by Job with
+	// name "b" that in Item with name "a".
+	// +optional
+	ContainerExtend *string `json:"containerExtend,omitempty" protobuf:"bytes,2,opt,name=containerExtend"`
 
-	NodeNameExtend *string
+	// If set, the pod of job will run on the node depends on the field.
+	// For example, set this filed "a->b", it means the job's pods will run on the node that K8sJob with
+	// name "b" that in Item with name "a" last finished.
+	// For example, set this filed "a->b->c", it means the job's pods will run on the node that VolcanoJob with
+	// name "b" that in Item with name "a" and has Task named "c" last finished.
+	// If set, the follow job will only be allowed to run one task and one pod.
+	// +optional
+	NodeNameExtend *string `json:"nodeNameExtend,omitempty" protobuf:"bytes,3,opt,name=nodeNameExtend"`
 
 	// Specification of the desired behavior of the job.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
-	K8sJobSpec *batchv1.JobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	K8sJobSpec *batchv1.JobSpec `json:"k8sJobSpec,omitempty" protobuf:"bytes,4,opt,name=k8sJobSpec"`
 
 	// Specification of the desired behavior of the volcano job, including the minAvailable
 	// +optional
-	VolcanoJobSpec *v1alpha1.JobSpec `json:"spec,omitempty" protobuf:"bytes,3,opt,name=spec"`
+	VolcanoJobSpec *v1alpha1.JobSpec `json:"VolcanoJobSpec,omitempty" protobuf:"bytes,5,opt,name=VolcanoJobSpec"`
 }
 
+// ServiceTemplate defines the service to create in Item, detailed information.
 type ServiceTemplate struct {
+
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	CleanUp bool
+	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
+	// execution (either Completed or Failed). If this field is set,
+	// ttlSecondsAfterFinished after the Job finishes, this service will be
+	// automatically deleted. If this field is unset,
+	// the Job won't be automatically deleted. If this field is set to zero,
+	// the Job becomes eligible to be deleted immediately after it finishes.
+	// +optional
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,2,opt,name=ttlSecondsAfterFinished"`
 
 	// Specification of the desired behavior of the volcano job, including the minAvailable
 	// +optional
-	Spec corev1.ServiceSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+	Spec corev1.ServiceSpec `json:"spec,omitempty" protobuf:"bytes,3,opt,name=spec"`
 }
 
+// ConfigMapTemplate defines the configmap to create in Item, detailed information.
 type ConfigMapTemplate struct {
-	CleanUp bool
 
-	ConfigMap corev1.ConfigMap
+	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
+	// execution (either Completed or Failed). If this field is set,
+	// ttlSecondsAfterFinished after the Job finishes, this configmap will be
+	// automatically deleted. If this field is unset,
+	// the Job won't be automatically deleted. If this field is set to zero,
+	// the Job becomes eligible to be deleted immediately after it finishes.
+	// +optional
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,1,opt,name=ttlSecondsAfterFinished"`
+
+	// +optional
+	ConfigMap corev1.ConfigMap `json:"configMap,omitempty" protobuf:"bytes,2,opt,name=configMap"`
 }
 
+// SecretTemplate defines the secret to create in Item, detailed information.
 type SecretTemplate struct {
-	CleanUp bool
 
-	Secret corev1.Secret
+	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
+	// execution (either Completed or Failed). If this field is set,
+	// ttlSecondsAfterFinished after the Job finishes, this secret will be
+	// automatically deleted. If this field is unset,
+	// the Job won't be automatically deleted. If this field is set to zero,
+	// the Job becomes eligible to be deleted immediately after it finishes.
+	// +optional
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,1,opt,name=ttlSecondsAfterFinished"`
+
+	// +optional
+	Secret corev1.Secret `json:"secret,omitempty" protobuf:"bytes,2,opt,name=secret"`
 }
 
 // JobPhase defines the phase of the job.
@@ -159,6 +241,7 @@ const (
 	Terminated  JobPhase = "Terminated"
 )
 
+// JobState defines the state of the job.
 type JobState struct {
 	// The phase of Job.
 	// +optional
@@ -177,16 +260,17 @@ type JobState struct {
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
 }
 
-// JobPhase defines the phase of the job.
+// ItemPhase defines the phase of the Item.
 type ItemPhase string
 
 const (
-	ItemPending   RegularModulePhase = "Unknown"
+	ItemPending   RegularModulePhase = "Pending"
 	ItemScheduled RegularModulePhase = "Scheduled"
 	ItemCompleted RegularModulePhase = "Completed"
 	ItemFailed    RegularModulePhase = "Failed"
 )
 
+// ItemStatus defines the state of the item.
 type ItemStatus struct {
 	Name string
 
@@ -209,7 +293,7 @@ type ItemStatus struct {
 	SecretStatus map[string]RegularModuleStatus
 }
 
-// JobPhase defines the phase of the job.
+// RegularModulePhase defines the phase of regular module.
 type RegularModulePhase string
 
 const (
