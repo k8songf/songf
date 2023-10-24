@@ -1,4 +1,4 @@
-module songF
+module songf.sh/songf
 
 go 1.20
 

@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1alpha1 "songF/api/v1alpha1"
+	appsv1alpha1 "songf.sh/songf/api/v1alpha1"
 )
 
 // JobBatchReconciler reconciles a JobBatch object

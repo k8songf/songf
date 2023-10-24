@@ -32,8 +32,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	appsv1alpha1 "songF/api/v1alpha1"
-	"songF/internal/controller"
+	appsv1alpha1 "songf.sh/songf/api/v1alpha1"
+	"songf.sh/songf/internal/controller"
 	//+kubebuilder:scaffold:imports
 )
 
