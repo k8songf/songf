@@ -26,7 +26,7 @@ import (
 //+genclient
 //+k8s:deepcopy-gen=package
 //+kubebuilder:object:root=true
-//+kubebuilder:resource:path=jobs,shortName=sfjob;sj
+//+kubebuilder:resource:categories=all,path=jobs,shortName=sfjob;sj
 //+kubebuilder:subresource:status
 
 // Job is the Schema for the jobs API

@@ -8,6 +8,8 @@ metadata:
 spec:
   group: apps.songf.sh
   names:
+    categories:
+    - all
     kind: Job
     listKind: JobList
     plural: jobs
