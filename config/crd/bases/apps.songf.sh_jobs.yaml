@@ -24676,6 +24676,7 @@ spec:
                       items:
                         type: string
                       type: array
+                      uniqueItems: true
                     truncated:
                       description: Default to false. If set true, this Item and its
                         child Items won't participate in the scheduling of taskflow
