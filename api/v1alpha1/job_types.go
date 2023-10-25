@@ -23,9 +23,6 @@ import (
 	"volcano.sh/apis/pkg/apis/batch/v1alpha1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 //+genclient
 //+k8s:deepcopy-gen=package
 //+kubebuilder:object:root=true
@@ -114,7 +111,7 @@ type ItemJobResource struct {
 	// +optional
 	ContainerExtend *string `json:"containerExtend,omitempty" protobuf:"bytes,1,opt,name=containerExtend"`
 
-	// Jobs to create
+	// Jobs to create, the names of job must be unique.
 	// +optional
 	Jobs []ItemJobTemplate `json:"jobs,omitempty" protobuf:"bytes,2,opt,name=jobs"`
 }
@@ -272,25 +269,45 @@ const (
 
 // ItemStatus defines the state of the item.
 type ItemStatus struct {
-	Name string
+	// The name of Item
+	// +optional
+	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 
-	Phase ItemPhase
+	// The phase of Item.
+	// +optional
+	Phase ItemPhase `json:"phase,omitempty" protobuf:"bytes,2,opt,name=phase"`
 
-	RunningJobNum *int32
+	// The num of Job which is running.
+	// +optional
+	RunningJobNum *int32 `json:"runningJobNum,omitempty" protobuf:"bytes,3,opt,name=runningJobNum"`
 
-	CompletedJobNum *int32
+	// The num of Job which is completed.
+	// +optional
+	CompletedJobNum *int32 `json:"completedJobNum,omitempty" protobuf:"bytes,4,opt,name=completedJobNum"`
 
-	FailedJobNum *int32
+	// The num of Job which is failed.
+	// +optional
+	FailedJobNum *int32 `json:"failedJobNum,omitempty" protobuf:"bytes,5,opt,name=failedJobNum"`
 
-	K8sJobStatus map[string]v1alpha1.JobState
+	// The status of k8s job, key is job name. K8s job use same describe with volcano job.
+	// +optional
+	K8sJobStatus map[string]v1alpha1.JobState `json:"k8sJobStatus,omitempty" protobuf:"bytes,6,opt,name=k8sJobStatus"`
 
-	VolcanoJobStatus map[string]v1alpha1.JobState
+	// The status of volcano job, key is job name.
+	// +optional
+	VolcanoJobStatus map[string]v1alpha1.JobState `json:"volcanoJobStatus,omitempty" protobuf:"bytes,7,opt,name=volcanoJobStatus"`
 
-	ServiceStatus map[string]RegularModuleStatus
+	// The status of service, key is service name.
+	// +optional
+	ServiceStatus map[string]RegularModuleStatus `json:"serviceStatus,omitempty" protobuf:"bytes,8,opt,name=serviceStatus"`
 
-	ConfigMapStatus map[string]RegularModuleStatus
+	// The status of configmap, key is configmap name.
+	// +optional
+	ConfigMapStatus map[string]RegularModuleStatus `json:"configMapStatus,omitempty" protobuf:"bytes,9,opt,name=configMapStatus"`
 
-	SecretStatus map[string]RegularModuleStatus
+	// The status of secret, key is secret name.
+	// +optional
+	SecretStatus map[string]RegularModuleStatus `json:"secretStatus,omitempty" protobuf:"bytes,10,opt,name=secretStatus"`
 }
 
 // RegularModulePhase defines the phase of regular module.
@@ -303,9 +320,15 @@ const (
 	RegularModuleFailed   RegularModulePhase = "Failed"
 )
 
+// RegularModuleStatus describe the status of module which don't need special description.
 type RegularModuleStatus struct {
-	Phase              RegularModulePhase
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,4,opt,name=lastTransitionTime"`
+	// The phase of RegularModule.
+	// +optional
+	Phase RegularModulePhase `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase"`
+
+	// Last time the condition transit from one phase to another.
+	// +optional
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,2,opt,name=lastTransitionTime"`
 }
 
 type JobTemplateSpec struct {
