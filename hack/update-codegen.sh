@@ -11,9 +11,10 @@ MODULE=songf.sh/songf
 
 #api包
 APIS_PKG=api
+NEW_APIS_PKG=pkg/api
 
 #代码生出输出，生成Resource时指定的group一样
-OUTPUT_PKG=generated/apps.songf.sh
+OUTPUT_PKG=pkg/client
 
 # group-version such as cronjob:v1
 GROUP=apps.songf.sh
@@ -24,17 +25,21 @@ SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo ../code-generator)}
 
 # kubebuilder2.3.2版本生成的api目录结构code-generator无法直接使用
-rm -rf "${APIS_PKG}/${GROUP}" && mkdir -p "${APIS_PKG}/${GROUP}" && cp -r "${APIS_PKG}/${VERSION}/" "${APIS_PKG}/${GROUP}"
+rm -rf "${NEW_APIS_PKG}/${GROUP}/${VERSION}" && mkdir -p "${NEW_APIS_PKG}/${GROUP}/${VERSION}" && cp -r "${APIS_PKG}/${VERSION}/" "${NEW_APIS_PKG}/${GROUP}/${VERSION}"
 
 # generate the code with:
 # --output-base    because this script should also be able to run inside the vendor dir of
 #                  k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
 #                  instead of the $GOPATH directly. For normal projects this can be dropped.
 #client,informer,lister(注意: code-generator 生成的deepcopy不适配 kubebuilder 所生成的api)
+echo "1:"${SCRIPT_ROOT}
+echo "1:"${MODULE}/${OUTPUT_PKG}
+echo "1:"${MODULE}/${NEW_APIS_PKG}
+echo "1:"${GROUP_VERSION}
 
 bash "${CODEGEN_PKG}"/generate-groups.sh "client,informer,lister" \
-  ${MODULE}/${OUTPUT_PKG} ${MODULE}/${APIS_PKG} \
+  ${MODULE}/${OUTPUT_PKG} ${MODULE}/${NEW_APIS_PKG} \
   ${GROUP_VERSION} \
-  --go-header-file "${SCRIPT_ROOT}"/hack/boilerplate.go.txt
+  --go-header-file "${SCRIPT_ROOT}"/hack/boilerplate.go.txt \
 #  --output-base "${SCRIPT_ROOT}"
 #  --output-base "${SCRIPT_ROOT}/../../.."
