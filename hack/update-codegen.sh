@@ -32,11 +32,6 @@ rm -rf "${NEW_APIS_PKG}/${GROUP}/${VERSION}" && mkdir -p "${NEW_APIS_PKG}/${GROU
 #                  k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
 #                  instead of the $GOPATH directly. For normal projects this can be dropped.
 #client,informer,lister(注意: code-generator 生成的deepcopy不适配 kubebuilder 所生成的api)
-echo "1:"${SCRIPT_ROOT}
-echo "1:"${MODULE}/${OUTPUT_PKG}
-echo "1:"${MODULE}/${NEW_APIS_PKG}
-echo "1:"${GROUP_VERSION}
-
 bash "${CODEGEN_PKG}"/generate-groups.sh "client,informer,lister" \
   ${MODULE}/${OUTPUT_PKG} ${MODULE}/${NEW_APIS_PKG} \
   ${GROUP_VERSION} \

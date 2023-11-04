@@ -13263,6 +13263,11 @@ spec:
                                   be replaced by Job with name "b" that in Item with
                                   name "a".
                                 type: string
+                              containerSave:
+                                description: Save container. If set true, job's container
+                                  will be saved. If other Item extend this job's container,
+                                  will be auto set true.
+                                type: boolean
                               k8sJobSpec:
                                 description: 'Specification of the desired behavior
                                   of the job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'

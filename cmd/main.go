@@ -18,6 +18,8 @@ package main
 
 import (
 	"flag"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -92,6 +94,9 @@ func main() {
 	if err = (&controller.JobReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Recorder: record.NewBroadcaster().NewRecorder(scheme, v1.EventSource{
+			Component: "songf",
+		}),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Job")
 		os.Exit(1)

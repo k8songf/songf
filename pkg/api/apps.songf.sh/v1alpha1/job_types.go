@@ -164,14 +164,19 @@ type ItemJobTemplate struct {
 	// +optional
 	NodeNameExtend *string `json:"nodeNameExtend,omitempty" protobuf:"bytes,3,opt,name=nodeNameExtend"`
 
+	// Save container. If set true, job's container will be saved.
+	// If other Item extend this job's container, will be auto set true.
+	// +optional
+	ContainerSave bool `json:"containerSave,omitempty" protobuf:"varint,4,opt,name=containerSave"`
+
 	// Specification of the desired behavior of the job.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
-	K8sJobSpec *batchv1.JobSpec `json:"k8sJobSpec,omitempty" protobuf:"bytes,4,opt,name=k8sJobSpec"`
+	K8sJobSpec *batchv1.JobSpec `json:"k8sJobSpec,omitempty" protobuf:"bytes,5,opt,name=k8sJobSpec"`
 
 	// Specification of the desired behavior of the volcano job, including the minAvailable
 	// +optional
-	VolcanoJobSpec *v1alpha1.JobSpec `json:"VolcanoJobSpec,omitempty" protobuf:"bytes,5,opt,name=VolcanoJobSpec"`
+	VolcanoJobSpec *v1alpha1.JobSpec `json:"VolcanoJobSpec,omitempty" protobuf:"bytes,6,opt,name=VolcanoJobSpec"`
 }
 
 // ServiceTemplate defines the service to create in Item, detailed information.
