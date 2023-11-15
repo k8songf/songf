@@ -21,13 +21,13 @@ import (
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"volcano.sh/apis/pkg/apis/batch/v1alpha1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
 	appsv1alpha1 "songf.sh/songf/pkg/api/apps.songf.sh/v1alpha1"
 )
 
@@ -52,21 +52,39 @@ type JobReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.2/pkg/reconcile
 func (r *JobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	job := &v1alpha1.Job{}
+	err := r.Client.Get(ctx, req.NamespacedName, job)
+	if err != nil {
+		klog.Errorf("reconcile get job err: %s", err.Error())
+	}
 
 	return ctrl.Result{}, nil
 }
 
+const CreateByJob = "songf.sh/job"
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *JobReconciler) SetupWithManager(mgr ctrl.Manager) error {
+
+	filter := predicate.NewPredicateFuncs(func(obj client.Object) bool {
+		if obj.GetObjectKind().GroupVersionKind().GroupVersion().Group == appsv1alpha1.GroupVersion.Group {
+			return true
+		}
+
+		annotations := obj.GetAnnotations()
+		_, ok := annotations[CreateByJob]
+		return ok
+	})
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.Job{}).
-		Owns(&v1.Job{}).
-		Owns(&v1alpha1.Job{}).
-		Owns(&corev1.Service{}).
-		Owns(&corev1.ConfigMap{}).
-		Owns(&corev1.Secret{}).
+		WithEventFilter(filter).
+		WithEventFilter(predicate.ResourceVersionChangedPredicate{}).
+		Watches(&v1.Job{}, &k8sJobEventHandler{}).
+		Watches(&v1alpha1.Job{}, &volcanoJobEventHandler{}).
+		Watches(&corev1.Service{}, &serviceEventHandler{}).
+		Watches(&corev1.ConfigMap{}, &configmapEventHandler{}).
+		Watches(&corev1.Secret{}, &secretEventHandler{}).
 		Complete(r)
 }
