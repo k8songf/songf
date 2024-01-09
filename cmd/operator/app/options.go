@@ -2,16 +2,24 @@ package app
 
 import (
 	"github.com/spf13/pflag"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type ServerOption struct {
 	MetricsAddr          string
 	ProbeAddr            string
 	EnableLeaderElection bool
+
+	Scheme *runtime.Scheme
 }
 
 func NewServerOption() *ServerOption {
 	return &ServerOption{}
+}
+
+func (s *ServerOption) WithScheme(scheme *runtime.Scheme) *ServerOption {
+	s.Scheme = scheme
+	return s
 }
 
 func (s *ServerOption) AddFlags(fs *pflag.FlagSet) {

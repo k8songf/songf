@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -53,10 +54,20 @@ type JobReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.2/pkg/reconcile
 func (r *JobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
-	job := &v1alpha1.Job{}
-	err := r.Client.Get(ctx, req.NamespacedName, job)
-	if err != nil {
+	job := &appsv1alpha1.Job{}
+
+	if err := r.Client.Get(ctx, req.NamespacedName, job); err != nil {
 		klog.Errorf("reconcile get job err: %s", err.Error())
+		return ctrl.Result{
+			Requeue: true,
+		}, fmt.Errorf("reconcile get job err: %s", err.Error())
+	}
+
+	if err := Cache.syncJobTree(job); err != nil {
+		klog.Errorf("add job to tree cache err: %s", err.Error())
+		return ctrl.Result{
+			Requeue: true,
+		}, fmt.Errorf("reconcile get job err: %s", err.Error())
 	}
 
 	return ctrl.Result{}, nil

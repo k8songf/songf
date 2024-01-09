@@ -3,7 +3,6 @@ package app
 import (
 	"fmt"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -12,17 +11,12 @@ import (
 	"songf.sh/songf/internal/controller"
 )
 
-var (
-	scheme = runtime.NewScheme()
-)
-
-type name struct {
-}
-
 func Run(opt ServerOption) error {
 
+	controller.InitializeCache()
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
+		Scheme:                 opt.Scheme,
 		Metrics:                metricsserver.Options{BindAddress: opt.MetricsAddr},
 		HealthProbeBindAddress: opt.ProbeAddr,
 		LeaderElection:         opt.EnableLeaderElection,
@@ -46,7 +40,7 @@ func Run(opt ServerOption) error {
 	if err = (&controller.JobReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-		Recorder: record.NewBroadcaster().NewRecorder(scheme, v1.EventSource{
+		Recorder: record.NewBroadcaster().NewRecorder(opt.Scheme, v1.EventSource{
 			Component: "songf",
 		}),
 	}).SetupWithManager(mgr); err != nil {

@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"github.com/spf13/pflag"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
@@ -51,9 +50,7 @@ func main() {
 
 	defer klog.Flush()
 
-	flag.Parse()
-
-	opt := app.NewServerOption()
+	opt := app.NewServerOption().WithScheme(scheme)
 	opt.AddFlags(pflag.CommandLine)
 
 	cliflag.InitFlags()
