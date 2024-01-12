@@ -17,6 +17,7 @@ func newJobItemTree(job *v1alpha1.Job) (*jobItemTree, error) {
 
 	nodeMap := map[string]*itemNode{}
 	var fatherNode *itemNode
+	itemStatus := map[string]v1alpha1.ItemStatus{}
 
 	for _, item := range job.Spec.Items {
 		if _, ok := nodeMap[item.Name]; ok {
@@ -36,6 +37,20 @@ func newJobItemTree(job *v1alpha1.Job) (*jobItemTree, error) {
 				fatherNode = nodeMap[item.Name]
 			}
 		}
+
+		flag := len(job.Status.ItemStatus) == 0
+		if _, ok := job.Status.ItemStatus[item.Name]; !ok {
+			flag = true
+		}
+
+		if flag {
+			itemStatus[item.Name] = v1alpha1.ItemStatus{
+				Name:  item.Name,
+				Phase: v1alpha1.ItemPending,
+			}
+		} else {
+			itemStatus[item.Name] = job.Status.ItemStatus[item.Name]
+		}
 	}
 
 	for _, node := range nodeMap {
@@ -54,7 +69,7 @@ func newJobItemTree(job *v1alpha1.Job) (*jobItemTree, error) {
 	tree := &jobItemTree{
 		startItemNode: fatherNode,
 		workNodes:     nodeMap,
-		itemStatus:    map[string]v1alpha1.ItemStatus{},
+		itemStatus:    itemStatus,
 	}
 
 	if tree.hasCycle() {

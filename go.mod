@@ -13,7 +13,7 @@ require (
 	k8s.io/component-base v0.28.3
 	k8s.io/klog/v2 v2.100.1
 	sigs.k8s.io/controller-runtime v0.16.2
-	volcano.sh/apis v1.8.0
+	volcano.sh/apis v1.8.2
 )
 
 require (

@@ -267,10 +267,11 @@ type JobState struct {
 type ItemPhase string
 
 const (
-	ItemPending   RegularModulePhase = "Pending"
-	ItemScheduled RegularModulePhase = "Scheduled"
-	ItemCompleted RegularModulePhase = "Completed"
-	ItemFailed    RegularModulePhase = "Failed"
+	ItemPending    ItemPhase = "Pending"
+	ItemScheduling ItemPhase = "Scheduling"
+	ItemScheduled  ItemPhase = "Scheduled"
+	ItemCompleted  ItemPhase = "Completed"
+	ItemFailed     ItemPhase = "Failed"
 )
 
 // ItemStatus defines the state of the item.

@@ -26,22 +26,31 @@ func newJobCache() *jobCache {
 	return cache
 }
 
-func (c *jobCache) syncJobTree(job *appsv1alpha1.Job) error {
+func (c *jobCache) syncJobTree(job *appsv1alpha1.Job) ([]*itemNode, error) {
+
+	var err error
+
 	c.Lock()
 	defer c.Unlock()
 
-	if _, ok := c.jobItemTreeCache[job.UID]; ok {
-		return nil
+	tree, ok := c.jobItemTreeCache[job.UID]
+	if !ok {
+		tree, err = newJobItemTree(job)
+		if err != nil {
+			return nil, err
+		}
+
+		c.jobItemTreeCache[job.UID] = tree
 	}
 
-	tree, err := newJobItemTree(job)
-	if err != nil {
-		return err
+	// find scheduled item and create resource
+	var schedulingItem []*itemNode
+
+	for name, status := range tree.itemStatus {
+		if status.Phase == appsv1alpha1.ItemScheduling {
+			schedulingItem = append(schedulingItem, tree.workNodes[name])
+		}
 	}
 
-	c.jobItemTreeCache[job.UID] = tree
-
-	// todo find scheduled item and create resource
-
-	return nil
+	return schedulingItem, nil
 }

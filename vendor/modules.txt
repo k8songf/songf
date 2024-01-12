@@ -726,7 +726,18 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
-# volcano.sh/apis v1.8.0
+# volcano.sh/apis v1.8.2
 ## explicit; go 1.19
 volcano.sh/apis/pkg/apis/batch/v1alpha1
 volcano.sh/apis/pkg/apis/bus/v1alpha1
+volcano.sh/apis/pkg/apis/flow/v1alpha1
+volcano.sh/apis/pkg/apis/nodeinfo/v1alpha1
+volcano.sh/apis/pkg/apis/scheduling
+volcano.sh/apis/pkg/apis/scheduling/v1beta1
+volcano.sh/apis/pkg/client/clientset/versioned
+volcano.sh/apis/pkg/client/clientset/versioned/scheme
+volcano.sh/apis/pkg/client/clientset/versioned/typed/batch/v1alpha1
+volcano.sh/apis/pkg/client/clientset/versioned/typed/bus/v1alpha1
+volcano.sh/apis/pkg/client/clientset/versioned/typed/flow/v1alpha1
+volcano.sh/apis/pkg/client/clientset/versioned/typed/nodeinfo/v1alpha1
+volcano.sh/apis/pkg/client/clientset/versioned/typed/scheduling/v1beta1

@@ -2,8 +2,6 @@ package app
 
 import (
 	"fmt"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -37,13 +35,12 @@ func Run(opt ServerOption) error {
 		return fmt.Errorf("%s:%s", err.Error(), "unable to start manager")
 	}
 
-	if err = (&controller.JobReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Recorder: record.NewBroadcaster().NewRecorder(opt.Scheme, v1.EventSource{
-			Component: "songf",
-		}),
-	}).SetupWithManager(mgr); err != nil {
+	reconciler, err := controller.NewJobReconciler(mgr.GetClient(), mgr.GetScheme())
+	if err != nil {
+		return err
+	}
+
+	if err = reconciler.SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("%s:%s-%s-%s", err.Error(), "unable to create controller", "controller", "Job")
 	}
 	if err = (&controller.JobBatchReconciler{
