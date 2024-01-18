@@ -2,121 +2,198 @@ package controller
 
 import (
 	"context"
-	"k8s.io/client-go/util/workqueue"
-	"sigs.k8s.io/controller-runtime/pkg/event"
+	"fmt"
+	v1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	appsv1alpha1 "songf.sh/songf/pkg/api/apps.songf.sh/v1alpha1"
+	"volcano.sh/apis/pkg/apis/batch/v1alpha1"
 )
 
-type k8sJobEventHandler struct {
+func (c *jobCache) kubeJobHandler(ctx context.Context, object client.Object) []reconcile.Request {
+
+	job, ok := object.(*v1.Job)
+	if !ok {
+		klog.Errorf("receive object %v/%v which is not kubeJob", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
+		return nil
+	}
+
+	c.Lock()
+	defer c.Unlock()
+
+	tree, err := c.getTreeFromAnnotationsAndOwnerReferences(job.Annotations, job.OwnerReferences)
+	if err != nil {
+		klog.Errorf("%s/%s get tree from cache err: %s", job.Namespace, job.Name, err.Error())
+		return nil
+	}
+
+	if err = tree.syncFromKubeJob(job); err != nil {
+		klog.Errorf("%s/%s sync tree from cache err: %s", job.Namespace, job.Name, err.Error())
+		return nil
+	}
+
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Name:      tree.name,
+				Namespace: tree.nameSpace,
+			},
+		},
+	}
+
 }
 
-func (k *k8sJobEventHandler) Create(ctx context.Context, event event.CreateEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
+func (c *jobCache) vcJobHandler(ctx context.Context, object client.Object) []reconcile.Request {
+	job, ok := object.(*v1alpha1.Job)
+	if !ok {
+		klog.Errorf("receive object %v/%v which is not vcJob", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
+		return nil
+	}
+
+	c.Lock()
+	defer c.Unlock()
+
+	tree, err := c.getTreeFromAnnotationsAndOwnerReferences(job.Annotations, job.OwnerReferences)
+	if err != nil {
+		klog.Errorf("%s/%s get tree from cache err: %s", job.Namespace, job.Name, err.Error())
+		return nil
+	}
+
+	if err = tree.syncFromVcJob(job); err != nil {
+		klog.Errorf("%s/%s sync tree from cache err: %s", job.Namespace, job.Name, err.Error())
+		return nil
+	}
+
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Name:      tree.name,
+				Namespace: tree.nameSpace,
+			},
+		},
+	}
+
 }
 
-func (k *k8sJobEventHandler) Update(ctx context.Context, event event.UpdateEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
+func (c *jobCache) serviceHandler(ctx context.Context, object client.Object) []reconcile.Request {
+	service, ok := object.(*corev1.Service)
+	if !ok {
+		klog.Errorf("receive object %v/%v which is not service", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
+		return nil
+	}
+
+	c.Lock()
+	defer c.Unlock()
+
+	tree, err := c.getTreeFromAnnotationsAndOwnerReferences(service.Annotations, service.OwnerReferences)
+	if err != nil {
+		klog.Errorf("%s/%s get tree from cache err: %s", service.Namespace, service.Name, err.Error())
+		return nil
+	}
+
+	if err = tree.syncFromService(service); err != nil {
+		klog.Errorf("%s/%s sync tree from cache err: %s", service.Namespace, service.Name, err.Error())
+		return nil
+	}
+
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Name:      tree.name,
+				Namespace: tree.nameSpace,
+			},
+		},
+	}
+
 }
 
-func (k *k8sJobEventHandler) Delete(ctx context.Context, event event.DeleteEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
+func (c *jobCache) configmapHandler(ctx context.Context, object client.Object) []reconcile.Request {
+
+	configmap, ok := object.(*corev1.ConfigMap)
+	if !ok {
+		klog.Errorf("receive object %v/%v which is not secret", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
+		return nil
+	}
+
+	c.Lock()
+	defer c.Unlock()
+
+	tree, err := c.getTreeFromAnnotationsAndOwnerReferences(configmap.Annotations, configmap.OwnerReferences)
+	if err != nil {
+		klog.Errorf("%s/%s get tree from cache err: %s", configmap.Namespace, configmap.Name, err.Error())
+		return nil
+	}
+
+	if err = tree.syncFromConfigmap(configmap); err != nil {
+		klog.Errorf("%s/%s sync tree from cache err: %s", configmap.Namespace, configmap.Name, err.Error())
+		return nil
+	}
+
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Name:      tree.name,
+				Namespace: tree.nameSpace,
+			},
+		},
+	}
+
 }
 
-func (k *k8sJobEventHandler) Generic(ctx context.Context, event event.GenericEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
+func (c *jobCache) secretHandler(ctx context.Context, object client.Object) []reconcile.Request {
+
+	secret, ok := object.(*corev1.Secret)
+	if !ok {
+		klog.Errorf("receive object %v/%v which is not configmap", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
+		return nil
+	}
+
+	c.Lock()
+	defer c.Unlock()
+
+	tree, err := c.getTreeFromAnnotationsAndOwnerReferences(secret.Annotations, secret.OwnerReferences)
+	if err != nil {
+		klog.Errorf("%s/%s get tree from cache err: %s", secret.Namespace, secret.Name, err.Error())
+		return nil
+	}
+
+	if err = tree.syncFromSecret(secret); err != nil {
+		klog.Errorf("%s/%s sync tree from cache err: %s", secret.Namespace, secret.Name, err.Error())
+		return nil
+	}
+
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Name:      tree.name,
+				Namespace: tree.nameSpace,
+			},
+		},
+	}
+
 }
 
-type volcanoJobEventHandler struct {
-}
+func (c *jobCache) getTreeFromAnnotationsAndOwnerReferences(annotations map[string]string, references []metav1.OwnerReference) (*jobItemTree, error) {
+	jobName, ok := annotations[CreateByJob]
+	if !ok {
+		return nil, fmt.Errorf("not found job name from annotations")
+	}
 
-func (v *volcanoJobEventHandler) Create(ctx context.Context, createEvent event.CreateEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
-}
+	var uuid types.UID
+	for _, reference := range references {
+		if reference.Name == jobName && reference.APIVersion == appsv1alpha1.GroupVersion.String() {
+			uuid = reference.UID
+		}
+	}
 
-func (v *volcanoJobEventHandler) Update(ctx context.Context, updateEvent event.UpdateEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
-}
+	tree, ok := c.jobItemTreeCache[uuid]
+	if !ok {
+		return nil, fmt.Errorf("not found job tree from cache %s/%s", jobName, string(uuid))
+	}
 
-func (v *volcanoJobEventHandler) Delete(ctx context.Context, deleteEvent event.DeleteEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (v *volcanoJobEventHandler) Generic(ctx context.Context, genericEvent event.GenericEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
-}
-
-type serviceEventHandler struct {
-}
-
-func (s *serviceEventHandler) Create(ctx context.Context, createEvent event.CreateEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (s *serviceEventHandler) Update(ctx context.Context, updateEvent event.UpdateEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (s *serviceEventHandler) Delete(ctx context.Context, deleteEvent event.DeleteEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (s *serviceEventHandler) Generic(ctx context.Context, genericEvent event.GenericEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
-}
-
-type configmapEventHandler struct {
-}
-
-func (c *configmapEventHandler) Create(ctx context.Context, createEvent event.CreateEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c *configmapEventHandler) Update(ctx context.Context, updateEvent event.UpdateEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c *configmapEventHandler) Delete(ctx context.Context, deleteEvent event.DeleteEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (c *configmapEventHandler) Generic(ctx context.Context, genericEvent event.GenericEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
-}
-
-type secretEventHandler struct {
-}
-
-func (s *secretEventHandler) Create(ctx context.Context, createEvent event.CreateEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (s *secretEventHandler) Update(ctx context.Context, updateEvent event.UpdateEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (s *secretEventHandler) Delete(ctx context.Context, deleteEvent event.DeleteEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (s *secretEventHandler) Generic(ctx context.Context, genericEvent event.GenericEvent, queue workqueue.RateLimitingInterface) {
-	//TODO implement me
-	panic("implement me")
+	return tree, nil
 }

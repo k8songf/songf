@@ -2,10 +2,18 @@ package controller
 
 import (
 	"fmt"
+	"k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"songf.sh/songf/pkg/api/apps.songf.sh/v1alpha1"
+	alpha1 "volcano.sh/apis/pkg/apis/batch/v1alpha1"
 )
 
 type jobItemTree struct {
+	name      string
+	uuid      types.UID
+	nameSpace string
+
 	startItemNode *itemNode
 
 	workNodes map[string]*itemNode
@@ -67,6 +75,10 @@ func newJobItemTree(job *v1alpha1.Job) (*jobItemTree, error) {
 	}
 
 	tree := &jobItemTree{
+		name:      job.Name,
+		uuid:      job.UID,
+		nameSpace: job.Namespace,
+
 		startItemNode: fatherNode,
 		workNodes:     nodeMap,
 		itemStatus:    itemStatus,
@@ -100,6 +112,26 @@ func (t *jobItemTree) hasCycleDfs(node *itemNode, visited map[string]bool) bool 
 	visited[node.item.Name] = false
 
 	return false
+}
+
+func (t *jobItemTree) syncFromService(service *corev1.Service) error {
+
+}
+
+func (t *jobItemTree) syncFromKubeJob(job *v1.Job) error {
+
+}
+
+func (t *jobItemTree) syncFromVcJob(job *alpha1.Job) error {
+
+}
+
+func (t *jobItemTree) syncFromConfigmap(configmap *corev1.ConfigMap) error {
+
+}
+
+func (t *jobItemTree) syncFromSecret(secret *corev1.Secret) error {
+
 }
 
 type itemNode struct {

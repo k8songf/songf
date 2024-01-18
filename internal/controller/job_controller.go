@@ -21,17 +21,17 @@ import (
 	"fmt"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	appsv1alpha1 "songf.sh/songf/pkg/api/apps.songf.sh/v1alpha1"
 	"volcano.sh/apis/pkg/apis/batch/v1alpha1"
-	vcclient "volcano.sh/apis/pkg/client/clientset/versioned"
 )
 
 // JobReconciler reconciles a Job object
@@ -39,8 +39,8 @@ type JobReconciler struct {
 	client.Client
 
 	// Clientset is a connection to the core kubernetes API
-	KubeClient *kubernetes.Clientset
-	VcClient   *vcclient.Clientset
+	//KubeClient *kubernetes.Clientset
+	//VcClient   *vcclient.Clientset
 
 	Scheme *runtime.Scheme
 }
@@ -52,20 +52,20 @@ func NewJobReconciler(client client.Client, scheme *runtime.Scheme) (*JobReconci
 		Scheme: scheme,
 	}
 
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, fmt.Errorf("build kube config err: %s", err.Error())
-	}
-
-	r.KubeClient, err = kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed init kubeClient, with err: %v", err)
-	}
-
-	r.VcClient, err = vcclient.NewForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed init vcClient, with err: %v", err)
-	}
+	//config, err := rest.InClusterConfig()
+	//if err != nil {
+	//	return nil, fmt.Errorf("build kube config err: %s", err.Error())
+	//}
+	//
+	//r.KubeClient, err = kubernetes.NewForConfig(config)
+	//if err != nil {
+	//	return nil, fmt.Errorf("failed init kubeClient, with err: %v", err)
+	//}
+	//
+	//r.VcClient, err = vcclient.NewForConfig(config)
+	//if err != nil {
+	//	return nil, fmt.Errorf("failed init vcClient, with err: %v", err)
+	//}
 
 	return r, nil
 }
@@ -88,18 +88,19 @@ func (r *JobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	job := &appsv1alpha1.Job{}
 
 	if err := r.Client.Get(ctx, req.NamespacedName, job); err != nil {
+		if errors.IsNotFound(err) {
+			klog.Infof("Job resource not found. Ignoring since object must be deleted.")
+			return reconcile.Result{}, nil
+		}
+
 		klog.Errorf("reconcile get job err: %s", err.Error())
-		return ctrl.Result{
-			Requeue: true,
-		}, fmt.Errorf("reconcile get job err: %s", err.Error())
+		return ctrl.Result{}, fmt.Errorf("reconcile get job err: %s", err.Error())
 	}
 
 	schedulingItems, err := Cache.syncJobTree(job)
 	if err != nil {
 		klog.Errorf("add job to tree cache err: %s", err.Error())
-		return ctrl.Result{
-			Requeue: true,
-		}, fmt.Errorf("reconcile get job err: %s", err.Error())
+		return ctrl.Result{}, fmt.Errorf("reconcile get job err: %s", err.Error())
 	}
 
 	switch job.Status.State.Phase {
@@ -118,9 +119,7 @@ func (r *JobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 				if err = r.createJobItem(context.Background(), job, &item); err != nil {
 					klog.Errorf("create job item err: %s", err.Error())
-					return ctrl.Result{
-						Requeue: true,
-					}, fmt.Errorf("reconcile get job err: %s", err.Error())
+					return ctrl.Result{}, fmt.Errorf("reconcile get job err: %s", err.Error())
 				}
 
 			} else {
@@ -134,9 +133,7 @@ func (r *JobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 		if err = r.Client.Status().Update(context.Background(), job); err != nil {
 			klog.Errorf("add job to tree cache err: %s", err.Error())
-			return ctrl.Result{
-				Requeue: true,
-			}, fmt.Errorf("reconcile get job err: %s", err.Error())
+			return ctrl.Result{}, fmt.Errorf("reconcile get job err: %s", err.Error())
 		}
 	default:
 		for _, node := range schedulingItems {
@@ -147,9 +144,7 @@ func (r *JobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 			if err = r.createJobItem(context.Background(), job, node.item); err != nil {
 				klog.Errorf("create job item err: %s", err.Error())
-				return ctrl.Result{
-					Requeue: true,
-				}, fmt.Errorf("reconcile get job err: %s", err.Error())
+				return ctrl.Result{}, fmt.Errorf("reconcile get job err: %s", err.Error())
 			}
 		}
 	}
@@ -202,49 +197,24 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 		return res
 	}
 
-	var vcJobCreated, kubeJobCreated, serviceCreated, cmCreated, secretCreated []string
-	releaseFn := func(vcJobCreated, kubeJobCreated, serviceCreated, cmCreated, secretCreated []string) {
-		for _, name := range vcJobCreated {
-			if err := r.KubeClient.BatchV1().Jobs(metav1.NamespaceDefault).Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
-				klog.Errorf(err.Error())
-			}
-		}
+	var createdObj []client.Object
 
-		for _, name := range kubeJobCreated {
-			if err := r.VcClient.BatchV1alpha1().Jobs(metav1.NamespaceDefault).Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
+	defer func() {
+		for _, obj := range createdObj {
+			if err := r.Delete(ctx, obj); err != nil {
 				klog.Errorf(err.Error())
 			}
 		}
-
-		for _, name := range serviceCreated {
-			if err := r.KubeClient.CoreV1().Services(metav1.NamespaceDefault).Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
-				klog.Errorf(err.Error())
-			}
-		}
-
-		for _, name := range cmCreated {
-			if err := r.KubeClient.CoreV1().ConfigMaps(metav1.NamespaceDefault).Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
-				klog.Errorf(err.Error())
-			}
-		}
-
-		for _, name := range secretCreated {
-			if err := r.KubeClient.CoreV1().Secrets(metav1.NamespaceDefault).Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
-				klog.Errorf(err.Error())
-			}
-		}
-	}
+	}()
 
 	for _, itemJob := range item.ItemJobs.Jobs {
 		// todo container extend and node name apply
 
 		if itemJob.K8sJobSpec == nil && itemJob.VolcanoJobSpec == nil {
-			releaseFn(vcJobCreated, kubeJobCreated, serviceCreated, cmCreated, secretCreated)
 			return fmt.Errorf("%s k8s itemJob and volcano itemJob can not be total nil", itemJob.Name)
 		}
 
 		if itemJob.K8sJobSpec != nil && itemJob.VolcanoJobSpec != nil {
-			releaseFn(vcJobCreated, kubeJobCreated, serviceCreated, cmCreated, secretCreated)
 			return fmt.Errorf("%s k8s itemJob and volcano itemJob can not be total exists", itemJob.Name)
 		}
 
@@ -256,41 +226,28 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 			Labels:          expendLabelFn(itemJob.Labels),
 		}
 
+		var job2Create client.Object
 		if itemJob.K8sJobSpec != nil {
 
-			job2Create := &v1.Job{
+			job2Create = &v1.Job{
 				ObjectMeta: jobObjectMeta,
 				Spec:       *itemJob.K8sJobSpec,
 			}
 
-			_, err := r.KubeClient.BatchV1().Jobs(metav1.NamespaceDefault).Create(ctx, job2Create, metav1.CreateOptions{})
-			if err != nil {
-				releaseFn(vcJobCreated, kubeJobCreated, serviceCreated, cmCreated, secretCreated)
-				return err
-			}
+		} else if itemJob.VolcanoJobSpec != nil {
 
-			kubeJobCreated = append(kubeJobCreated, jobName)
-
-			continue
-		}
-
-		if itemJob.VolcanoJobSpec != nil {
-
-			job2Create := &v1alpha1.Job{
+			job2Create = &v1alpha1.Job{
 				ObjectMeta: jobObjectMeta,
 				Spec:       *itemJob.VolcanoJobSpec,
 			}
 
-			_, err := r.VcClient.BatchV1alpha1().Jobs(metav1.NamespaceDefault).Create(ctx, job2Create, metav1.CreateOptions{})
-			if err != nil {
-				releaseFn(vcJobCreated, kubeJobCreated, serviceCreated, cmCreated, secretCreated)
-				return err
-			}
-
-			vcJobCreated = append(vcJobCreated, jobName)
-
-			continue
 		}
+
+		if err := r.Create(ctx, job2Create); err != nil {
+			return err
+		}
+
+		createdObj = append(createdObj, job2Create)
 
 	}
 
@@ -310,13 +267,11 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 			Spec:       service.Spec,
 		}
 
-		_, err := r.KubeClient.CoreV1().Services(metav1.NamespaceDefault).Create(ctx, service2Create, metav1.CreateOptions{})
-		if err != nil {
-			releaseFn(vcJobCreated, kubeJobCreated, serviceCreated, cmCreated, secretCreated)
+		if err := r.Create(ctx, service2Create); err != nil {
 			return err
 		}
 
-		serviceCreated = append(serviceCreated, serviceName)
+		createdObj = append(createdObj, service2Create)
 
 	}
 
@@ -331,13 +286,11 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 		cmImpl.OwnerReferences = ownerReference
 		cmImpl.Name = cmName
 
-		_, err := r.KubeClient.CoreV1().ConfigMaps(metav1.NamespaceDefault).Create(ctx, cmImpl, metav1.CreateOptions{})
-		if err != nil {
-			releaseFn(vcJobCreated, kubeJobCreated, serviceCreated, cmCreated, secretCreated)
+		if err := r.Create(ctx, cmImpl); err != nil {
 			return err
 		}
 
-		cmCreated = append(cmCreated, cmName)
+		createdObj = append(createdObj, cmImpl)
 
 	}
 
@@ -352,13 +305,11 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 		secretImpl.OwnerReferences = ownerReference
 		secretImpl.Name = secretName
 
-		_, err := r.KubeClient.CoreV1().Secrets(metav1.NamespaceDefault).Create(ctx, secretImpl, metav1.CreateOptions{})
-		if err != nil {
-			releaseFn(vcJobCreated, kubeJobCreated, serviceCreated, cmCreated, secretCreated)
+		if err := r.Create(ctx, secretImpl); err != nil {
 			return err
 		}
 
-		secretCreated = append(secretCreated, secretName)
+		createdObj = append(createdObj, secretImpl)
 
 	}
 
@@ -385,10 +336,10 @@ func (r *JobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&appsv1alpha1.Job{}).
 		WithEventFilter(filter).
 		WithEventFilter(predicate.ResourceVersionChangedPredicate{}).
-		Watches(&v1.Job{}, &k8sJobEventHandler{}).
-		Watches(&v1alpha1.Job{}, &volcanoJobEventHandler{}).
-		Watches(&corev1.Service{}, &serviceEventHandler{}).
-		Watches(&corev1.ConfigMap{}, &configmapEventHandler{}).
-		Watches(&corev1.Secret{}, &secretEventHandler{}).
+		Watches(&v1.Job{}, handler.EnqueueRequestsFromMapFunc(Cache.kubeJobHandler)).
+		Watches(&v1alpha1.Job{}, handler.EnqueueRequestsFromMapFunc(Cache.vcJobHandler)).
+		Watches(&corev1.Service{}, handler.EnqueueRequestsFromMapFunc(Cache.serviceHandler)).
+		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(Cache.configmapHandler)).
+		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(Cache.secretHandler)).
 		Complete(r)
 }

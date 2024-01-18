@@ -6,21 +6,9 @@
   <component name="ChangeListManager">
     <list default="true" id="4e7dc50e-b68f-4004-b6c1-18bfdfff4910" name="更改" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/operator/app/server.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/operator/app/server.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.sum" beforeDir="false" afterPath="$PROJECT_DIR$/go.sum" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/internal/controller/cache.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/controller/cache.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/internal/controller/cache_event_handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/controller/cache_event_handler.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/controller/cache_item_tree.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/controller/cache_item_tree.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/internal/controller/job_controller.go" beforeDir="false" afterPath="$PROJECT_DIR$/internal/controller/job_controller.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pkg/api/apps.songf.sh/v1alpha1/job_types.go" beforeDir="false" afterPath="$PROJECT_DIR$/pkg/api/apps.songf.sh/v1alpha1/job_types.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/vendor/modules.txt" beforeDir="false" afterPath="$PROJECT_DIR$/vendor/modules.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/vendor/volcano.sh/apis/LICENSE" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/vendor/volcano.sh/apis/pkg/apis/batch/v1alpha1/doc.go" beforeDir="false" afterPath="$PROJECT_DIR$/vendor/volcano.sh/apis/pkg/apis/batch/v1alpha1/doc.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/vendor/volcano.sh/apis/pkg/apis/batch/v1alpha1/job.go" beforeDir="false" afterPath="$PROJECT_DIR$/vendor/volcano.sh/apis/pkg/apis/batch/v1alpha1/job.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/vendor/volcano.sh/apis/pkg/apis/batch/v1alpha1/labels.go" beforeDir="false" afterPath="$PROJECT_DIR$/vendor/volcano.sh/apis/pkg/apis/batch/v1alpha1/labels.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/vendor/volcano.sh/apis/pkg/apis/batch/v1alpha1/zz_generated.deepcopy.go" beforeDir="false" afterPath="$PROJECT_DIR$/vendor/volcano.sh/apis/pkg/apis/batch/v1alpha1/zz_generated.deepcopy.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/vendor/volcano.sh/apis/pkg/apis/bus/v1alpha1/events.go" beforeDir="false" afterPath="$PROJECT_DIR$/vendor/volcano.sh/apis/pkg/apis/bus/v1alpha1/events.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/vendor/volcano.sh/apis/pkg/apis/bus/v1alpha1/zz_generated.deepcopy.go" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
