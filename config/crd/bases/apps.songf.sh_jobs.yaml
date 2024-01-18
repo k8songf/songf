@@ -24748,31 +24748,6 @@ spec:
                 additionalProperties:
                   description: ItemStatus defines the state of the item.
                   properties:
-                    KubeJobStatus:
-                      additionalProperties:
-                        description: JobState contains details for the current state
-                          of the job.
-                        properties:
-                          lastTransitionTime:
-                            description: Last time the condition transit from one
-                              phase to another.
-                            format: date-time
-                            type: string
-                          message:
-                            description: Human-readable message indicating details
-                              about last transition.
-                            type: string
-                          phase:
-                            description: The phase of Job.
-                            type: string
-                          reason:
-                            description: Unique, one-word, CamelCase reason for the
-                              phase's last transition.
-                            type: string
-                        type: object
-                      description: The status of kube job, key is job name. kube job
-                        use same describe with volcano job.
-                      type: object
                     completedJobNum:
                       description: The num of Job which is completed.
                       format: int32
@@ -24797,6 +24772,30 @@ spec:
                       description: The num of Job which is failed.
                       format: int32
                       type: integer
+                    jobStatus:
+                      additionalProperties:
+                        description: JobState contains details for the current state
+                          of the job.
+                        properties:
+                          lastTransitionTime:
+                            description: Last time the condition transit from one
+                              phase to another.
+                            format: date-time
+                            type: string
+                          message:
+                            description: Human-readable message indicating details
+                              about last transition.
+                            type: string
+                          phase:
+                            description: The phase of Job.
+                            type: string
+                          reason:
+                            description: Unique, one-word, CamelCase reason for the
+                              phase's last transition.
+                            type: string
+                        type: object
+                      description: The status of volcano job, key is job name.
+                      type: object
                     name:
                       description: The name of Item
                       type: string
@@ -24838,30 +24837,6 @@ spec:
                             type: string
                         type: object
                       description: The status of service, key is service name.
-                      type: object
-                    volcanoJobStatus:
-                      additionalProperties:
-                        description: JobState contains details for the current state
-                          of the job.
-                        properties:
-                          lastTransitionTime:
-                            description: Last time the condition transit from one
-                              phase to another.
-                            format: date-time
-                            type: string
-                          message:
-                            description: Human-readable message indicating details
-                              about last transition.
-                            type: string
-                          phase:
-                            description: The phase of Job.
-                            type: string
-                          reason:
-                            description: Unique, one-word, CamelCase reason for the
-                              phase's last transition.
-                            type: string
-                        type: object
-                      description: The status of volcano job, key is job name.
                       type: object
                   type: object
                 description: Current state of each open Item, including jobs and modules.
@@ -49621,31 +49596,6 @@ spec:
                 additionalProperties:
                   description: ItemStatus defines the state of the item.
                   properties:
-                    KubeJobStatus:
-                      additionalProperties:
-                        description: JobState contains details for the current state
-                          of the job.
-                        properties:
-                          lastTransitionTime:
-                            description: Last time the condition transit from one
-                              phase to another.
-                            format: date-time
-                            type: string
-                          message:
-                            description: Human-readable message indicating details
-                              about last transition.
-                            type: string
-                          phase:
-                            description: The phase of Job.
-                            type: string
-                          reason:
-                            description: Unique, one-word, CamelCase reason for the
-                              phase's last transition.
-                            type: string
-                        type: object
-                      description: The status of kube job, key is job name. kube job
-                        use same describe with volcano job.
-                      type: object
                     completedJobNum:
                       description: The num of Job which is completed.
                       format: int32
@@ -49670,6 +49620,30 @@ spec:
                       description: The num of Job which is failed.
                       format: int32
                       type: integer
+                    jobStatus:
+                      additionalProperties:
+                        description: JobState contains details for the current state
+                          of the job.
+                        properties:
+                          lastTransitionTime:
+                            description: Last time the condition transit from one
+                              phase to another.
+                            format: date-time
+                            type: string
+                          message:
+                            description: Human-readable message indicating details
+                              about last transition.
+                            type: string
+                          phase:
+                            description: The phase of Job.
+                            type: string
+                          reason:
+                            description: Unique, one-word, CamelCase reason for the
+                              phase's last transition.
+                            type: string
+                        type: object
+                      description: The status of volcano job, key is job name.
+                      type: object
                     name:
                       description: The name of Item
                       type: string
@@ -49711,30 +49685,6 @@ spec:
                             type: string
                         type: object
                       description: The status of service, key is service name.
-                      type: object
-                    volcanoJobStatus:
-                      additionalProperties:
-                        description: JobState contains details for the current state
-                          of the job.
-                        properties:
-                          lastTransitionTime:
-                            description: Last time the condition transit from one
-                              phase to another.
-                            format: date-time
-                            type: string
-                          message:
-                            description: Human-readable message indicating details
-                              about last transition.
-                            type: string
-                          phase:
-                            description: The phase of Job.
-                            type: string
-                          reason:
-                            description: Unique, one-word, CamelCase reason for the
-                              phase's last transition.
-                            type: string
-                        type: object
-                      description: The status of volcano job, key is job name.
                       type: object
                   type: object
                 description: Current state of each open Item, including jobs and modules.

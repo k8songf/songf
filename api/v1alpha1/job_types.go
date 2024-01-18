@@ -296,25 +296,21 @@ type ItemStatus struct {
 	// +optional
 	FailedJobNum *int32 `json:"failedJobNum,omitempty" protobuf:"bytes,5,opt,name=failedJobNum"`
 
-	// The status of kube job, key is job name. kube job use same describe with volcano job.
-	// +optional
-	KubeJobStatus map[string]v1alpha1.JobState `json:"KubeJobStatus,omitempty" protobuf:"bytes,6,opt,name=kubeJobStatus"`
-
 	// The status of volcano job, key is job name.
 	// +optional
-	VolcanoJobStatus map[string]v1alpha1.JobState `json:"volcanoJobStatus,omitempty" protobuf:"bytes,7,opt,name=volcanoJobStatus"`
+	JobStatus map[string]v1alpha1.JobState `json:"jobStatus,omitempty" protobuf:"bytes,6,opt,name=jobStatus"`
 
 	// The status of service, key is service name.
 	// +optional
-	ServiceStatus map[string]RegularModuleStatus `json:"serviceStatus,omitempty" protobuf:"bytes,8,opt,name=serviceStatus"`
+	ServiceStatus map[string]RegularModuleStatus `json:"serviceStatus,omitempty" protobuf:"bytes,7,opt,name=serviceStatus"`
 
 	// The status of configmap, key is configmap name.
 	// +optional
-	ConfigMapStatus map[string]RegularModuleStatus `json:"configMapStatus,omitempty" protobuf:"bytes,9,opt,name=configMapStatus"`
+	ConfigMapStatus map[string]RegularModuleStatus `json:"configMapStatus,omitempty" protobuf:"bytes,8,opt,name=configMapStatus"`
 
 	// The status of secret, key is secret name.
 	// +optional
-	SecretStatus map[string]RegularModuleStatus `json:"secretStatus,omitempty" protobuf:"bytes,10,opt,name=secretStatus"`
+	SecretStatus map[string]RegularModuleStatus `json:"secretStatus,omitempty" protobuf:"bytes,9,opt,name=secretStatus"`
 }
 
 // RegularModulePhase defines the phase of regular module.

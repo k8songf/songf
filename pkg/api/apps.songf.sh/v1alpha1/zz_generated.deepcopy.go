@@ -191,15 +191,8 @@ func (in *ItemStatus) DeepCopyInto(out *ItemStatus) {
 		*out = new(int32)
 		**out = **in
 	}
-	if in.KubeJobStatus != nil {
-		in, out := &in.KubeJobStatus, &out.KubeJobStatus
-		*out = make(map[string]batchv1alpha1.JobState, len(*in))
-		for key, val := range *in {
-			(*out)[key] = *val.DeepCopy()
-		}
-	}
-	if in.VolcanoJobStatus != nil {
-		in, out := &in.VolcanoJobStatus, &out.VolcanoJobStatus
+	if in.JobStatus != nil {
+		in, out := &in.JobStatus, &out.JobStatus
 		*out = make(map[string]batchv1alpha1.JobState, len(*in))
 		for key, val := range *in {
 			(*out)[key] = *val.DeepCopy()

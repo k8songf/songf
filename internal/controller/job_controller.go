@@ -223,7 +223,7 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 			return fmt.Errorf("%s k8s itemJob and volcano itemJob can not be total exists", itemJob.Name)
 		}
 
-		jobName := fmt.Sprintf("%s-%s", item.Name, itemJob.Name)
+		jobName := calItemSubName(job.Name, item.Name, itemJob.Name)
 		jobObjectMeta := metav1.ObjectMeta{
 			Name:            jobName,
 			OwnerReferences: ownerReference,
@@ -258,7 +258,7 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 
 	for _, service := range item.ItemModules.Services {
 
-		serviceName := fmt.Sprintf("%s-%s", item.Name, service.Name)
+		serviceName := calItemSubName(job.Name, item.Name, service.Name)
 
 		serviceObjectMeta := metav1.ObjectMeta{
 			Name:            serviceName,
@@ -282,7 +282,7 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 
 	for _, cm := range item.ItemModules.ConfigMaps {
 
-		cmName := fmt.Sprintf("%s-%s", item.Name, cm.ConfigMap.Name)
+		cmName := calItemSubName(job.Name, item.Name, cm.ConfigMap.Name)
 
 		cmImpl := cm.ConfigMap.DeepCopy()
 
@@ -301,7 +301,7 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 
 	for _, secret := range item.ItemModules.Secrets {
 
-		secretName := fmt.Sprintf("%s-%s", item.Name, secret.Secret.Name)
+		secretName := calItemSubName(job.Name, item.Name, secret.Secret.Name)
 
 		secretImpl := secret.Secret.DeepCopy()
 
