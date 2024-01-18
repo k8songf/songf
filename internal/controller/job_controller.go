@@ -166,13 +166,18 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 		},
 	}
 
-	jobAnnotations := job.Annotations
-	jobLabels := job.Labels
+	baseAnnotations := job.Annotations
+	baseAnnotations[CreateByJob] = job.Name
+	baseAnnotations[CreateByJobItem] = item.Name
+
+	baseLabels := job.Labels
+	baseLabels[CreateByJob] = job.Name
+	baseLabels[CreateByJobItem] = item.Name
 
 	expendAnnotationFn := func(extend map[string]string) map[string]string {
 		res := map[string]string{}
 
-		for k, v := range jobAnnotations {
+		for k, v := range baseAnnotations {
 			res[k] = v
 		}
 
@@ -186,7 +191,7 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 	expendLabelFn := func(extend map[string]string) map[string]string {
 		res := map[string]string{}
 
-		for k, v := range jobLabels {
+		for k, v := range baseLabels {
 			res[k] = v
 		}
 
@@ -210,11 +215,11 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 	for _, itemJob := range item.ItemJobs.Jobs {
 		// todo container extend and node name apply
 
-		if itemJob.K8sJobSpec == nil && itemJob.VolcanoJobSpec == nil {
+		if itemJob.KubeJobSpec == nil && itemJob.VolcanoJobSpec == nil {
 			return fmt.Errorf("%s k8s itemJob and volcano itemJob can not be total nil", itemJob.Name)
 		}
 
-		if itemJob.K8sJobSpec != nil && itemJob.VolcanoJobSpec != nil {
+		if itemJob.KubeJobSpec != nil && itemJob.VolcanoJobSpec != nil {
 			return fmt.Errorf("%s k8s itemJob and volcano itemJob can not be total exists", itemJob.Name)
 		}
 
@@ -227,11 +232,11 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 		}
 
 		var job2Create client.Object
-		if itemJob.K8sJobSpec != nil {
+		if itemJob.KubeJobSpec != nil {
 
 			job2Create = &v1.Job{
 				ObjectMeta: jobObjectMeta,
-				Spec:       *itemJob.K8sJobSpec,
+				Spec:       *itemJob.KubeJobSpec,
 			}
 
 		} else if itemJob.VolcanoJobSpec != nil {
@@ -317,7 +322,10 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 
 }
 
-const CreateByJob = "songf.sh/job"
+const (
+	CreateByJob     = "songf.sh/job"
+	CreateByJobItem = "songf.sh/job-item"
+)
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *JobReconciler) SetupWithManager(mgr ctrl.Manager) error {

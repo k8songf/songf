@@ -94,7 +94,7 @@ type Item struct {
 	// +kubebuilder:validation:UniqueItems=true
 	RunAfter []string `json:"runAfter,omitempty" protobuf:"bytes,3,opt,name=runAfter"`
 
-	// ItemJobs defines the jobs scheduled in this Item, including volcano job and k8s job.
+	// ItemJobs defines the jobs scheduled in this Item, including volcano job and kube job.
 	// +optional
 	ItemJobs ItemJobResource `json:"itemJobs,omitempty" protobuf:"bytes,4,opt,name=ItemJobs"`
 
@@ -142,7 +142,7 @@ type ItemModuleResource struct {
 	Secrets []SecretTemplate `json:"secrets,omitempty" protobuf:"bytes,4,opt,name=secrets"`
 }
 
-// ItemJobTemplate defines the jobs to create in Item, detailed information. K8sJobSpec and VolcanoJobSpec only one exist.
+// ItemJobTemplate defines the jobs to create in Item, detailed information. KubeJobSpec and VolcanoJobSpec only one exist.
 type ItemJobTemplate struct {
 	// Standard object's metadata of the jobs created from this template.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -156,7 +156,7 @@ type ItemJobTemplate struct {
 	ContainerExtend *string `json:"containerExtend,omitempty" protobuf:"bytes,2,opt,name=containerExtend"`
 
 	// If set, the pod of job will run on the node depends on the field.
-	// For example, set this filed "a->b", it means the job's pods will run on the node that K8sJob with
+	// For example, set this filed "a->b", it means the job's pods will run on the node that KubeJob with
 	// name "b" that in Item with name "a" last finished.
 	// For example, set this filed "a->b->c", it means the job's pods will run on the node that VolcanoJob with
 	// name "b" that in Item with name "a" and has Task named "c" last finished.
@@ -172,7 +172,7 @@ type ItemJobTemplate struct {
 	// Specification of the desired behavior of the job.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
-	K8sJobSpec *batchv1.JobSpec `json:"k8sJobSpec,omitempty" protobuf:"bytes,5,opt,name=k8sJobSpec"`
+	KubeJobSpec *batchv1.JobSpec `json:"kubeJobSpec,omitempty" protobuf:"bytes,5,opt,name=kubeJobSpec"`
 
 	// Specification of the desired behavior of the volcano job, including the minAvailable
 	// +optional
@@ -267,10 +267,11 @@ type JobState struct {
 type ItemPhase string
 
 const (
-	ItemPending   RegularModulePhase = "Pending"
-	ItemScheduled RegularModulePhase = "Scheduled"
-	ItemCompleted RegularModulePhase = "Completed"
-	ItemFailed    RegularModulePhase = "Failed"
+	ItemPending    ItemPhase = "Pending"
+	ItemScheduling ItemPhase = "Scheduling"
+	ItemScheduled  ItemPhase = "Scheduled"
+	ItemCompleted  ItemPhase = "Completed"
+	ItemFailed     ItemPhase = "Failed"
 )
 
 // ItemStatus defines the state of the item.
@@ -295,9 +296,9 @@ type ItemStatus struct {
 	// +optional
 	FailedJobNum *int32 `json:"failedJobNum,omitempty" protobuf:"bytes,5,opt,name=failedJobNum"`
 
-	// The status of k8s job, key is job name. K8s job use same describe with volcano job.
+	// The status of kube job, key is job name. kube job use same describe with volcano job.
 	// +optional
-	K8sJobStatus map[string]v1alpha1.JobState `json:"k8sJobStatus,omitempty" protobuf:"bytes,6,opt,name=k8sJobStatus"`
+	KubeJobStatus map[string]v1alpha1.JobState `json:"KubeJobStatus,omitempty" protobuf:"bytes,6,opt,name=kubeJobStatus"`
 
 	// The status of volcano job, key is job name.
 	// +optional

@@ -110,8 +110,8 @@ func (in *ItemJobTemplate) DeepCopyInto(out *ItemJobTemplate) {
 		*out = new(string)
 		**out = **in
 	}
-	if in.K8sJobSpec != nil {
-		in, out := &in.K8sJobSpec, &out.K8sJobSpec
+	if in.KubeJobSpec != nil {
+		in, out := &in.KubeJobSpec, &out.KubeJobSpec
 		*out = new(v1.JobSpec)
 		(*in).DeepCopyInto(*out)
 	}
@@ -191,8 +191,8 @@ func (in *ItemStatus) DeepCopyInto(out *ItemStatus) {
 		*out = new(int32)
 		**out = **in
 	}
-	if in.K8sJobStatus != nil {
-		in, out := &in.K8sJobStatus, &out.K8sJobStatus
+	if in.KubeJobStatus != nil {
+		in, out := &in.KubeJobStatus, &out.KubeJobStatus
 		*out = make(map[string]batchv1alpha1.JobState, len(*in))
 		for key, val := range *in {
 			(*out)[key] = *val.DeepCopy()

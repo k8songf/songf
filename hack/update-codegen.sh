@@ -37,4 +37,3 @@ bash "${CODEGEN_PKG}"/generate-groups.sh "client,informer,lister" \
   ${GROUP_VERSION} \
   --go-header-file "${SCRIPT_ROOT}"/hack/boilerplate.go.txt \
 #  --output-base "${SCRIPT_ROOT}"
-#  --output-base "${SCRIPT_ROOT}/../../.."
