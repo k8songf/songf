@@ -2,10 +2,8 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -16,6 +14,12 @@ import (
 
 func (c *jobCache) kubeJobHandler(ctx context.Context, object client.Object) []reconcile.Request {
 
+	jobName, _ := getJobNameAndItemNameFromObject(object)
+	if jobName == "" {
+		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
+		return nil
+	}
+
 	job, ok := object.(*v1.Job)
 	if !ok {
 		klog.Errorf("receive object %v/%v which is not kubeJob", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
@@ -25,16 +29,63 @@ func (c *jobCache) kubeJobHandler(ctx context.Context, object client.Object) []r
 	c.Lock()
 	defer c.Unlock()
 
-	tree, err := c.getTreeFromAnnotationsAndOwnerReferences(job.Annotations, job.OwnerReferences)
-	if err != nil {
-		klog.Errorf("%s/%s get tree from cache err: %s", job.Namespace, job.Name, err.Error())
-		return nil
+	tree, ok := c.jobItemTreeCache[jobName]
+	if !ok {
+		tree = newJobItemTree()
 	}
 
-	if err = tree.syncFromKubeJob(job); err != nil {
+	fn := func(status *appsv1alpha1.ItemStatus) {
+		jobState, ok := status.JobStatus[job.Name]
+		if !ok {
+			jobState = v1alpha1.JobState{
+				Phase:              v1alpha1.Pending,
+				LastTransitionTime: job.CreationTimestamp,
+			}
+		}
+
+		if job.DeletionTimestamp != nil && !job.DeletionTimestamp.IsZero() {
+			jobState = v1alpha1.JobState{
+				Phase:              v1alpha1.Terminated,
+				LastTransitionTime: *job.DeletionTimestamp,
+			}
+			status.JobStatus[job.Name] = jobState
+			return
+		}
+
+		conditionsLength := len(job.Status.Conditions)
+		if conditionsLength > 0 {
+			condition := job.Status.Conditions[conditionsLength-1]
+
+			jobState.LastTransitionTime = condition.LastTransitionTime
+			jobState.Message = condition.Message
+			jobState.Reason = condition.Reason
+
+			switch condition.Type {
+			case v1.JobSuspended:
+				jobState.Phase = v1alpha1.Aborted
+
+			case v1.JobComplete:
+				jobState.Phase = v1alpha1.Completed
+
+			case v1.JobFailureTarget, v1.JobFailed:
+				jobState.Phase = v1alpha1.Failed
+
+			default:
+				klog.Errorf("can not recognize kube job %s/%s condition type: %s", job.Namespace, job.Name, condition.Type)
+			}
+		}
+
+		status.JobStatus[job.Name] = jobState
+		return
+
+	}
+
+	if err := tree.syncFromObject(job, fn); err != nil {
 		klog.Errorf("%s/%s sync tree from cache err: %s", job.Namespace, job.Name, err.Error())
 		return nil
 	}
+
+	c.jobItemTreeCache[jobName] = tree
 
 	return []reconcile.Request{
 		{
@@ -48,6 +99,13 @@ func (c *jobCache) kubeJobHandler(ctx context.Context, object client.Object) []r
 }
 
 func (c *jobCache) vcJobHandler(ctx context.Context, object client.Object) []reconcile.Request {
+
+	jobName, _ := getJobNameAndItemNameFromObject(object)
+	if jobName == "" {
+		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
+		return nil
+	}
+
 	job, ok := object.(*v1alpha1.Job)
 	if !ok {
 		klog.Errorf("receive object %v/%v which is not vcJob", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
@@ -57,16 +115,21 @@ func (c *jobCache) vcJobHandler(ctx context.Context, object client.Object) []rec
 	c.Lock()
 	defer c.Unlock()
 
-	tree, err := c.getTreeFromAnnotationsAndOwnerReferences(job.Annotations, job.OwnerReferences)
-	if err != nil {
-		klog.Errorf("%s/%s get tree from cache err: %s", job.Namespace, job.Name, err.Error())
-		return nil
+	tree, ok := c.jobItemTreeCache[jobName]
+	if !ok {
+		tree = newJobItemTree()
 	}
 
-	if err = tree.syncFromVcJob(job); err != nil {
+	fn := func(status *appsv1alpha1.ItemStatus) {
+		status.JobStatus[job.Name] = job.Status.State
+	}
+
+	if err := tree.syncFromObject(job, fn); err != nil {
 		klog.Errorf("%s/%s sync tree from cache err: %s", job.Namespace, job.Name, err.Error())
 		return nil
 	}
+
+	c.jobItemTreeCache[jobName] = tree
 
 	return []reconcile.Request{
 		{
@@ -80,6 +143,13 @@ func (c *jobCache) vcJobHandler(ctx context.Context, object client.Object) []rec
 }
 
 func (c *jobCache) serviceHandler(ctx context.Context, object client.Object) []reconcile.Request {
+
+	jobName, _ := getJobNameAndItemNameFromObject(object)
+	if jobName == "" {
+		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
+		return nil
+	}
+
 	service, ok := object.(*corev1.Service)
 	if !ok {
 		klog.Errorf("receive object %v/%v which is not service", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
@@ -89,16 +159,36 @@ func (c *jobCache) serviceHandler(ctx context.Context, object client.Object) []r
 	c.Lock()
 	defer c.Unlock()
 
-	tree, err := c.getTreeFromAnnotationsAndOwnerReferences(service.Annotations, service.OwnerReferences)
-	if err != nil {
-		klog.Errorf("%s/%s get tree from cache err: %s", service.Namespace, service.Name, err.Error())
-		return nil
+	tree, ok := c.jobItemTreeCache[jobName]
+	if !ok {
+		tree = newJobItemTree()
 	}
 
-	if err = tree.syncFromService(service); err != nil {
+	fn := func(status *appsv1alpha1.ItemStatus) {
+		serviceStatus, ok := status.ServiceStatus[service.Name]
+		if !ok {
+			serviceStatus = appsv1alpha1.RegularModuleStatus{
+				Phase: appsv1alpha1.RegularModuleUnknown,
+			}
+		}
+
+		if service.DeletionTimestamp == nil || service.DeletionTimestamp.IsZero() {
+
+			serviceStatus.Phase = appsv1alpha1.RegularModuleCreated
+			serviceStatus.LastTransitionTime = service.CreationTimestamp
+		} else {
+			serviceStatus.Phase = appsv1alpha1.RegularModuleFailed
+			serviceStatus.LastTransitionTime = *service.DeletionTimestamp
+		}
+		status.ServiceStatus[service.Name] = serviceStatus
+	}
+
+	if err := tree.syncFromObject(service, fn); err != nil {
 		klog.Errorf("%s/%s sync tree from cache err: %s", service.Namespace, service.Name, err.Error())
 		return nil
 	}
+
+	c.jobItemTreeCache[jobName] = tree
 
 	return []reconcile.Request{
 		{
@@ -113,6 +203,12 @@ func (c *jobCache) serviceHandler(ctx context.Context, object client.Object) []r
 
 func (c *jobCache) configmapHandler(ctx context.Context, object client.Object) []reconcile.Request {
 
+	jobName, _ := getJobNameAndItemNameFromObject(object)
+	if jobName == "" {
+		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
+		return nil
+	}
+
 	configmap, ok := object.(*corev1.ConfigMap)
 	if !ok {
 		klog.Errorf("receive object %v/%v which is not secret", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
@@ -122,13 +218,31 @@ func (c *jobCache) configmapHandler(ctx context.Context, object client.Object) [
 	c.Lock()
 	defer c.Unlock()
 
-	tree, err := c.getTreeFromAnnotationsAndOwnerReferences(configmap.Annotations, configmap.OwnerReferences)
-	if err != nil {
-		klog.Errorf("%s/%s get tree from cache err: %s", configmap.Namespace, configmap.Name, err.Error())
-		return nil
+	tree, ok := c.jobItemTreeCache[jobName]
+	if !ok {
+		tree = newJobItemTree()
 	}
 
-	if err = tree.syncFromConfigmap(configmap); err != nil {
+	fn := func(status *appsv1alpha1.ItemStatus) {
+		cmStatus, ok := status.ConfigMapStatus[configmap.Name]
+		if !ok {
+			cmStatus = appsv1alpha1.RegularModuleStatus{
+				Phase: appsv1alpha1.RegularModuleUnknown,
+			}
+		}
+
+		if configmap.DeletionTimestamp == nil || configmap.DeletionTimestamp.IsZero() {
+
+			cmStatus.Phase = appsv1alpha1.RegularModuleCreated
+			cmStatus.LastTransitionTime = configmap.CreationTimestamp
+		} else {
+			cmStatus.Phase = appsv1alpha1.RegularModuleFailed
+			cmStatus.LastTransitionTime = *configmap.DeletionTimestamp
+		}
+		status.ServiceStatus[configmap.Name] = cmStatus
+	}
+
+	if err := tree.syncFromObject(configmap, fn); err != nil {
 		klog.Errorf("%s/%s sync tree from cache err: %s", configmap.Namespace, configmap.Name, err.Error())
 		return nil
 	}
@@ -146,6 +260,12 @@ func (c *jobCache) configmapHandler(ctx context.Context, object client.Object) [
 
 func (c *jobCache) secretHandler(ctx context.Context, object client.Object) []reconcile.Request {
 
+	jobName, _ := getJobNameAndItemNameFromObject(object)
+	if jobName == "" {
+		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
+		return nil
+	}
+
 	secret, ok := object.(*corev1.Secret)
 	if !ok {
 		klog.Errorf("receive object %v/%v which is not configmap", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
@@ -155,13 +275,31 @@ func (c *jobCache) secretHandler(ctx context.Context, object client.Object) []re
 	c.Lock()
 	defer c.Unlock()
 
-	tree, err := c.getTreeFromAnnotationsAndOwnerReferences(secret.Annotations, secret.OwnerReferences)
-	if err != nil {
-		klog.Errorf("%s/%s get tree from cache err: %s", secret.Namespace, secret.Name, err.Error())
-		return nil
+	tree, ok := c.jobItemTreeCache[jobName]
+	if !ok {
+		tree = newJobItemTree()
 	}
 
-	if err = tree.syncFromSecret(secret); err != nil {
+	fn := func(status *appsv1alpha1.ItemStatus) {
+		secretStatus, ok := status.SecretStatus[secret.Name]
+		if !ok {
+			secretStatus = appsv1alpha1.RegularModuleStatus{
+				Phase: appsv1alpha1.RegularModuleUnknown,
+			}
+		}
+
+		if secret.DeletionTimestamp == nil || secret.DeletionTimestamp.IsZero() {
+
+			secretStatus.Phase = appsv1alpha1.RegularModuleCreated
+			secretStatus.LastTransitionTime = secret.CreationTimestamp
+		} else {
+			secretStatus.Phase = appsv1alpha1.RegularModuleFailed
+			secretStatus.LastTransitionTime = *secret.DeletionTimestamp
+		}
+		status.SecretStatus[secret.Name] = secretStatus
+	}
+
+	if err := tree.syncFromObject(secret, fn); err != nil {
 		klog.Errorf("%s/%s sync tree from cache err: %s", secret.Namespace, secret.Name, err.Error())
 		return nil
 	}
@@ -175,25 +313,4 @@ func (c *jobCache) secretHandler(ctx context.Context, object client.Object) []re
 		},
 	}
 
-}
-
-func (c *jobCache) getTreeFromAnnotationsAndOwnerReferences(annotations map[string]string, references []metav1.OwnerReference) (*jobItemTree, error) {
-	jobName, ok := annotations[CreateByJob]
-	if !ok {
-		return nil, fmt.Errorf("not found job name from annotations")
-	}
-
-	var uuid types.UID
-	for _, reference := range references {
-		if reference.Name == jobName && reference.APIVersion == appsv1alpha1.GroupVersion.String() {
-			uuid = reference.UID
-		}
-	}
-
-	tree, ok := c.jobItemTreeCache[uuid]
-	if !ok {
-		return nil, fmt.Errorf("not found job tree from cache %s/%s", jobName, string(uuid))
-	}
-
-	return tree, nil
 }

@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"k8s.io/apimachinery/pkg/types"
 	appsv1alpha1 "songf.sh/songf/pkg/api/apps.songf.sh/v1alpha1"
 	"sync"
 )
@@ -15,42 +14,66 @@ func InitializeCache() {
 type jobCache struct {
 	sync.RWMutex
 
-	jobItemTreeCache map[types.UID]*jobItemTree
+	jobItemTreeCache map[string]*jobItemTree
 }
 
 func newJobCache() *jobCache {
 	cache := &jobCache{
-		jobItemTreeCache: map[types.UID]*jobItemTree{},
+		jobItemTreeCache: map[string]*jobItemTree{},
 	}
 
 	return cache
 }
 
-func (c *jobCache) syncJobTree(job *appsv1alpha1.Job) ([]*itemNode, error) {
-
-	var err error
+func (c *jobCache) syncJobTree(job *appsv1alpha1.Job) error {
 
 	c.Lock()
 	defer c.Unlock()
 
-	tree, ok := c.jobItemTreeCache[job.UID]
+	tree, ok := c.jobItemTreeCache[job.Name]
 	if !ok {
-		tree, err = newJobItemTree(job)
-		if err != nil {
-			return nil, err
-		}
+		tree = newJobItemTree()
+	}
+	if err := tree.syncFromJob(job); err != nil {
+		return err
+	}
+	tree.syncStatusPhase()
+	c.jobItemTreeCache[job.Name] = tree
 
-		c.jobItemTreeCache[job.UID] = tree
+	return nil
+}
+
+func (c *jobCache) getFirstJobItem(jobName string) (*appsv1alpha1.Item, bool) {
+
+	c.Lock()
+	defer c.Unlock()
+
+	tree, ok := c.jobItemTreeCache[jobName]
+	if !ok {
+		return nil, false
 	}
 
-	// find scheduled item and create resource
-	var schedulingItem []*itemNode
-
-	for name, status := range tree.itemStatus {
-		if status.Phase == appsv1alpha1.ItemScheduling {
-			schedulingItem = append(schedulingItem, tree.workNodes[name])
-		}
+	if tree.startItemNode == nil || tree.startItemNode.item == nil {
+		return nil, false
 	}
 
-	return schedulingItem, nil
+	return tree.startItemNode.item, true
+
+}
+
+func (c *jobCache) getNextScheduleJobItem(jobName string) ([]*appsv1alpha1.Item, bool) {
+	c.Lock()
+	defer c.Unlock()
+
+	tree, ok := c.jobItemTreeCache[jobName]
+	if !ok {
+		return nil, false
+	}
+
+	nextItems := tree.itemsNext2Scheduled()
+	if len(nextItems) == 0 {
+		return nil, false
+	}
+	return nextItems, true
+
 }

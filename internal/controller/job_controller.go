@@ -97,62 +97,56 @@ func (r *JobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, fmt.Errorf("reconcile get job err: %s", err.Error())
 	}
 
-	schedulingItems, err := Cache.syncJobTree(job)
-	if err != nil {
+	// sync cache
+	if err := Cache.syncJobTree(job); err != nil {
 		klog.Errorf("add job to tree cache err: %s", err.Error())
 		return ctrl.Result{}, fmt.Errorf("reconcile get job err: %s", err.Error())
 	}
 
-	switch job.Status.State.Phase {
-	case appsv1alpha1.Unknown:
+	// if job was new created, update status
+	if job.Status.State.Phase == appsv1alpha1.Unknown {
 		job.Status.State.Phase = appsv1alpha1.Scheduled
 		job.Status.State.Message = "job scheduled"
-
 		job.Status.ItemStatus = map[string]appsv1alpha1.ItemStatus{}
-		for _, item := range job.Spec.Items {
 
-			if len(item.RunAfter) == 0 {
-				job.Status.ItemStatus[item.Name] = appsv1alpha1.ItemStatus{
-					Name:  item.Name,
-					Phase: appsv1alpha1.ItemScheduling,
-				}
-
-				if err = r.createJobItem(context.Background(), job, &item); err != nil {
-					klog.Errorf("create job item err: %s", err.Error())
-					return ctrl.Result{}, fmt.Errorf("reconcile get job err: %s", err.Error())
-				}
-
-			} else {
-				job.Status.ItemStatus[item.Name] = appsv1alpha1.ItemStatus{
-					Name:  item.Name,
-					Phase: appsv1alpha1.ItemPending,
-				}
-			}
-
-		}
-
-		if err = r.Client.Status().Update(context.Background(), job); err != nil {
+		if err := r.Client.Status().Update(context.Background(), job); err != nil {
 			klog.Errorf("add job to tree cache err: %s", err.Error())
 			return ctrl.Result{}, fmt.Errorf("reconcile get job err: %s", err.Error())
 		}
-	default:
-		for _, node := range schedulingItems {
-			job.Status.ItemStatus[node.item.Name] = appsv1alpha1.ItemStatus{
-				Name:  node.item.Name,
-				Phase: appsv1alpha1.ItemScheduling,
-			}
 
-			if err = r.createJobItem(context.Background(), job, node.item); err != nil {
+		return ctrl.Result{}, nil
+	}
+
+	// get status in cache and compare with one in k8s.
+	// If the result has diff, update status.
+	// todo
+
+	// if job was a scheduled one, schedule next items
+	if job.Status.State.Phase == appsv1alpha1.Scheduled {
+
+		schedulingItems, ok := Cache.getNextScheduleJobItem(job.Name)
+		if !ok {
+			klog.Errorf("create job item err: not find %s first item", job.Name)
+		}
+
+		for _, item := range schedulingItems {
+			if err := r.createJobItem(context.Background(), job, item); err != nil {
 				klog.Errorf("create job item err: %s", err.Error())
 				return ctrl.Result{}, fmt.Errorf("reconcile get job err: %s", err.Error())
 			}
 		}
+
 	}
 
 	return ctrl.Result{}, nil
 }
 
 func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job, item *appsv1alpha1.Item) error {
+
+	job.Status.ItemStatus[item.Name] = appsv1alpha1.ItemStatus{
+		Name:  item.Name,
+		Phase: appsv1alpha1.ItemScheduling,
+	}
 
 	trueFlag := true
 	ownerReference := []metav1.OwnerReference{
