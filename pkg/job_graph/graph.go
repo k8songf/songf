@@ -1,4 +1,4 @@
-package controller
+package job_graph
 
 import (
 	"fmt"
@@ -6,16 +6,17 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"songf.sh/songf/pkg/api/apps.songf.sh/v1alpha1"
+	"songf.sh/songf/pkg/api/utils"
 	"sync"
 	alpha1 "volcano.sh/apis/pkg/apis/batch/v1alpha1"
 )
 
-type jobItemTree struct {
+type JobItemGraph struct {
 	sync.RWMutex
 
-	name      string
-	uuid      types.UID
-	nameSpace string
+	Name      string
+	Uuid      types.UID
+	NameSpace string
 
 	startItemNode *itemNode
 
@@ -24,18 +25,25 @@ type jobItemTree struct {
 	itemStatus map[string]*v1alpha1.ItemStatus
 }
 
-func newJobItemTree() *jobItemTree {
-	return &jobItemTree{
+func NewJobItemGraph() *JobItemGraph {
+	return &JobItemGraph{
 		workNodes:  map[string]*itemNode{},
 		itemStatus: map[string]*v1alpha1.ItemStatus{},
 	}
 }
 
-func (t *jobItemTree) hasCycle() bool {
+func (t *JobItemGraph) GetStartItem() (*v1alpha1.Item, bool) {
+	if t.startItemNode == nil || t.startItemNode.item == nil {
+		return nil, false
+	}
+	return t.startItemNode.item, true
+}
+
+func (t *JobItemGraph) HasCycle() bool {
 	return t.hasCycleDfs(t.startItemNode, map[string]bool{})
 }
 
-func (t *jobItemTree) hasCycleDfs(node *itemNode, visited map[string]bool) bool {
+func (t *JobItemGraph) hasCycleDfs(node *itemNode, visited map[string]bool) bool {
 
 	if visited[node.item.Name] {
 		return true
@@ -55,18 +63,18 @@ func (t *jobItemTree) hasCycleDfs(node *itemNode, visited map[string]bool) bool 
 }
 
 // =============================================
-func (t *jobItemTree) syncFromJob(job *v1alpha1.Job) error {
+func (t *JobItemGraph) SyncFromJob(job *v1alpha1.Job) error {
 
-	t.name = job.Name
-	t.uuid = job.UID
-	t.nameSpace = job.Namespace
+	t.Name = job.Name
+	t.Uuid = job.UID
+	t.NameSpace = job.Namespace
 
 	nodeMap := map[string]*itemNode{}
 	var fatherNode *itemNode
 
 	for _, item := range job.Spec.Items {
 		if _, ok := nodeMap[item.Name]; ok {
-			return fmt.Errorf("new job item tree build err: item name %s repeated", item.Name)
+			return fmt.Errorf("new job item tree build err: item Name %s repeated", item.Name)
 		}
 
 		var itemImpl *v1alpha1.Item
@@ -109,7 +117,7 @@ func (t *jobItemTree) syncFromJob(job *v1alpha1.Job) error {
 
 		for _, parentName := range node.item.RunAfter {
 			if _, ok := nodeMap[parentName]; !ok {
-				return fmt.Errorf("not find parent item name %s", parentName)
+				return fmt.Errorf("not find parent item Name %s", parentName)
 			} else {
 				nodeMap[parentName].child = append(nodeMap[parentName].child, nodeImpl)
 			}
@@ -118,23 +126,22 @@ func (t *jobItemTree) syncFromJob(job *v1alpha1.Job) error {
 	t.startItemNode = fatherNode
 	t.workNodes = nodeMap
 
-	if t.hasCycle() {
+	if t.HasCycle() {
 		return fmt.Errorf("job %s is not a directed acyclic graph", job.Name)
 	}
 
 	return nil
 }
 
-// =============================================
-func (t *jobItemTree) syncFromObject(object client.Object, fn func(status *v1alpha1.ItemStatus)) error {
-	_, itemName := getJobNameAndItemNameFromObject(object)
+func (t *JobItemGraph) SyncFromObject(object client.Object, fn func(status *v1alpha1.ItemStatus)) error {
+	_, itemName := utils.GetJobNameAndItemNameFromObject(object)
 
 	t.Lock()
 	defer t.Unlock()
 
 	status, ok := t.itemStatus[itemName]
 	if !ok {
-		klog.Infof("not found item %s from %s/%s tree while sync object, create a scheduling one", itemName, t.nameSpace, t.name)
+		klog.Infof("not found item %s from %s/%s tree while sync object, create a scheduling one", itemName, t.NameSpace, t.Name)
 		status = &v1alpha1.ItemStatus{
 			Phase: v1alpha1.ItemScheduling,
 			Name:  itemName,
@@ -165,22 +172,22 @@ func (t *jobItemTree) syncFromObject(object client.Object, fn func(status *v1alp
 	return nil
 }
 
-func (t *jobItemTree) syncStatusPhase() {
+func (t *JobItemGraph) SyncStatusPhase() {
 	for itemName, _ := range t.workNodes {
 		t.syncItemStatusPhase(itemName)
 	}
 }
 
-func (t *jobItemTree) syncItemStatusPhase(itemName string) {
+func (t *JobItemGraph) syncItemStatusPhase(itemName string) {
 	status, ok := t.itemStatus[itemName]
 	if !ok {
-		klog.Infof("not found item %s from %s/%s tree", itemName, t.nameSpace, t.name)
+		klog.Infof("not found item %s from %s/%s tree", itemName, t.NameSpace, t.Name)
 		return
 	}
 
 	workNode, ok := t.workNodes[itemName]
 	if !ok {
-		klog.Infof("can not find item %s from cache tree %s/%s", itemName, t.nameSpace, t.name)
+		klog.Infof("can not find item %s from cache tree %s/%s", itemName, t.NameSpace, t.Name)
 		return
 	}
 
@@ -197,7 +204,7 @@ func (t *jobItemTree) syncItemStatusPhase(itemName string) {
 	}
 
 	for _, job := range workNode.item.ItemJobs.Jobs {
-		name := calItemSubName(t.name, itemName, job.Name)
+		name := utils.CalJobItemSubName(t.Name, itemName, job.Name)
 
 		state, ok := status.JobStatus[name]
 		if !ok {
@@ -242,7 +249,7 @@ func (t *jobItemTree) syncItemStatusPhase(itemName string) {
 	return
 }
 
-func (t *jobItemTree) itemsNext2Scheduled() []*v1alpha1.Item {
+func (t *JobItemGraph) ItemsNext2Scheduled() []*v1alpha1.Item {
 	var res []*v1alpha1.Item
 
 	for itemName, itemStatus := range t.itemStatus {

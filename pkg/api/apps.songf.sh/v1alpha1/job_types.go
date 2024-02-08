@@ -139,6 +139,14 @@ type ItemModuleResource struct {
 	// secrets to create, names can not be repeated
 	// +optional
 	Secrets []SecretTemplate `json:"secrets,omitempty" protobuf:"bytes,4,opt,name=secrets"`
+
+	// pvcs to create, names can not be repeated
+	// +optional
+	Pvcs []PvcTemplate `json:"pvcs,omitempty" protobuf:"bytes,5,opt,name=pvcs"`
+
+	// pvs to create, names can not be repeated
+	// +optional
+	Pvs []PvTemplate `json:"pvs,omitempty" protobuf:"bytes,6,opt,name=pvs"`
 }
 
 // ItemJobTemplate defines the jobs to create in Item, detailed information. KubeJobSpec and VolcanoJobSpec only one exist.
@@ -230,6 +238,44 @@ type SecretTemplate struct {
 	Secret corev1.Secret `json:"secret,omitempty" protobuf:"bytes,2,opt,name=secret"`
 }
 
+// PvcTemplate defines the pvc to create in Item, detailed information.
+type PvcTemplate struct {
+
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
+	// execution (either Completed or Failed). If this field is set,
+	// ttlSecondsAfterFinished after the Job finishes, this secret will be
+	// automatically deleted. If this field is unset,
+	// the Job won't be automatically deleted. If this field is set to zero,
+	// the Job becomes eligible to be deleted immediately after it finishes.
+	// +optional
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,2,opt,name=ttlSecondsAfterFinished"`
+
+	// +optional
+	Pvc corev1.PersistentVolumeClaimSpec `json:"pvc,omitempty" protobuf:"bytes,3,opt,name=pvc"`
+}
+
+// PvTemplate defines the pv to create in Item, detailed information.
+type PvTemplate struct {
+
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
+	// execution (either Completed or Failed). If this field is set,
+	// ttlSecondsAfterFinished after the Job finishes, this secret will be
+	// automatically deleted. If this field is unset,
+	// the Job won't be automatically deleted. If this field is set to zero,
+	// the Job becomes eligible to be deleted immediately after it finishes.
+	// +optional
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,2,opt,name=ttlSecondsAfterFinished"`
+
+	// +optional
+	Pv corev1.PersistentVolumeSpec `json:"pvc,omitempty" protobuf:"bytes,3,opt,name=pv"`
+}
+
 // JobPhase defines the phase of the job.
 type JobPhase string
 
@@ -310,6 +356,12 @@ type ItemStatus struct {
 	// The status of secret, key is secret name.
 	// +optional
 	SecretStatus map[string]RegularModuleStatus `json:"secretStatus,omitempty" protobuf:"bytes,9,opt,name=secretStatus"`
+
+	// +optional
+	PvcStatus map[string]RegularModuleStatus `json:"pvcStatus,omitempty" protobuf:"bytes,9,opt,name=pvcStatus"`
+
+	// +optional
+	PvStatus map[string]RegularModuleStatus `json:"pvStatus,omitempty" protobuf:"bytes,9,opt,name=pvStatus"`
 }
 
 // RegularModulePhase defines the phase of regular module.
