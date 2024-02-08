@@ -91,7 +91,6 @@ type Item struct {
 	// When Items with name set in this field Success, this Item will start to run.
 	// If set null, this Item will be the first one. Only one Item can set this field null.
 	// +optional
-	// +kubebuilder:validation:UniqueItems=true
 	RunAfter []string `json:"runAfter,omitempty" protobuf:"bytes,3,opt,name=runAfter"`
 
 	// ItemJobs defines the jobs scheduled in this Item, including volcano job and kube job.
