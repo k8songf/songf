@@ -6,7 +6,6 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"songf.sh/songf/pkg/api/apps.songf.sh/v1alpha1"
-	"songf.sh/songf/pkg/api/utils"
 	"sync"
 	alpha1 "volcano.sh/apis/pkg/apis/batch/v1alpha1"
 )
@@ -18,79 +17,37 @@ type JobItemGraph struct {
 	Uuid      types.UID
 	NameSpace string
 
-	startItemNode *itemNode
+	startItemNode *v1alpha1.ItemNode
 
-	workNodes map[string]*itemNode
+	workNodes map[string]*v1alpha1.ItemNode
 
 	itemStatus map[string]*v1alpha1.ItemStatus
 }
 
 func NewJobItemGraph() *JobItemGraph {
 	return &JobItemGraph{
-		workNodes:  map[string]*itemNode{},
-		itemStatus: map[string]*v1alpha1.ItemStatus{},
+		startItemNode: &v1alpha1.ItemNode{},
+		workNodes:     map[string]*v1alpha1.ItemNode{},
+		itemStatus:    map[string]*v1alpha1.ItemStatus{},
 	}
 }
 
 func (t *JobItemGraph) GetStartItem() (*v1alpha1.Item, bool) {
-	if t.startItemNode == nil || t.startItemNode.item == nil {
+	if t.startItemNode == nil || t.startItemNode.Item == nil {
 		return nil, false
 	}
-	return t.startItemNode.item, true
+	return t.startItemNode.Item, true
 }
 
-func (t *JobItemGraph) HasCycle() bool {
-	return t.hasCycleDfs(t.startItemNode, map[string]bool{})
-}
-
-func (t *JobItemGraph) hasCycleDfs(node *itemNode, visited map[string]bool) bool {
-
-	if visited[node.item.Name] {
-		return true
-	}
-
-	visited[node.item.Name] = true
-
-	for _, child := range node.child {
-		if t.hasCycleDfs(child, visited) {
-			return true
-		}
-	}
-
-	visited[node.item.Name] = false
-
-	return false
-}
-
-// =============================================
 func (t *JobItemGraph) SyncFromJob(job *v1alpha1.Job) error {
+
+	var err error
 
 	t.Name = job.Name
 	t.Uuid = job.UID
 	t.NameSpace = job.Namespace
 
-	nodeMap := map[string]*itemNode{}
-	var fatherNode *itemNode
-
 	for _, item := range job.Spec.Items {
-		if _, ok := nodeMap[item.Name]; ok {
-			return fmt.Errorf("new job item tree build err: item Name %s repeated", item.Name)
-		}
-
-		var itemImpl *v1alpha1.Item
-		itemImpl = &item
-		nodeMap[item.Name] = &itemNode{
-			item: itemImpl,
-		}
-
-		if len(item.RunAfter) == 0 {
-			if fatherNode != nil {
-				return fmt.Errorf("new job item tree build err: muilty start item")
-			} else {
-				fatherNode = nodeMap[item.Name]
-			}
-		}
-
 		_, ok := t.itemStatus[item.Name]
 		if !ok {
 			flag := len(job.Status.ItemStatus) == 0
@@ -111,22 +68,12 @@ func (t *JobItemGraph) SyncFromJob(job *v1alpha1.Job) error {
 
 	}
 
-	for _, node := range nodeMap {
-		var nodeImpl *itemNode
-		nodeImpl = node
-
-		for _, parentName := range node.item.RunAfter {
-			if _, ok := nodeMap[parentName]; !ok {
-				return fmt.Errorf("not find parent item Name %s", parentName)
-			} else {
-				nodeMap[parentName].child = append(nodeMap[parentName].child, nodeImpl)
-			}
-		}
+	t.startItemNode, t.workNodes, err = v1alpha1.NewGraphFromJob(job)
+	if err != nil {
+		return err
 	}
-	t.startItemNode = fatherNode
-	t.workNodes = nodeMap
 
-	if t.HasCycle() {
+	if !v1alpha1.IsJobHasCycleDfs(t.startItemNode, map[string]bool{}) {
 		return fmt.Errorf("job %s is not a directed acyclic graph", job.Name)
 	}
 
@@ -134,7 +81,7 @@ func (t *JobItemGraph) SyncFromJob(job *v1alpha1.Job) error {
 }
 
 func (t *JobItemGraph) SyncFromObject(object client.Object, fn func(status *v1alpha1.ItemStatus)) error {
-	_, itemName := utils.GetJobNameAndItemNameFromObject(object)
+	_, itemName := v1alpha1.GetJobNameAndItemNameFromObject(object)
 
 	t.Lock()
 	defer t.Unlock()
@@ -203,8 +150,8 @@ func (t *JobItemGraph) syncItemStatusPhase(itemName string) {
 		*status.FailedJobNum = 0
 	}
 
-	for _, job := range workNode.item.ItemJobs.Jobs {
-		name := utils.CalJobItemSubName(t.Name, itemName, job.Name)
+	for _, job := range workNode.Item.ItemJobs.Jobs {
+		name := v1alpha1.CalJobItemSubName(t.Name, itemName, job.Name)
 
 		state, ok := status.JobStatus[name]
 		if !ok {
@@ -238,7 +185,7 @@ func (t *JobItemGraph) syncItemStatusPhase(itemName string) {
 
 	if status.FailedJobNum != nil && *status.FailedJobNum > 0 {
 		status.Phase = v1alpha1.ItemFailed
-	} else if status.CompletedJobNum != nil && *status.CompletedJobNum == int32(len(workNode.item.ItemJobs.Jobs)) {
+	} else if status.CompletedJobNum != nil && *status.CompletedJobNum == int32(len(workNode.Item.ItemJobs.Jobs)) {
 		status.Phase = v1alpha1.ItemCompleted
 	} else if jobStateNotFoundNum == 0 {
 		status.Phase = v1alpha1.ItemScheduled
@@ -258,7 +205,7 @@ func (t *JobItemGraph) ItemsNext2Scheduled() []*v1alpha1.Item {
 		}
 
 		flag := true
-		for _, fatherItemName := range t.workNodes[itemName].item.RunAfter {
+		for _, fatherItemName := range t.workNodes[itemName].Item.RunAfter {
 			status, ok := t.itemStatus[fatherItemName]
 			if !ok {
 				flag = false
@@ -272,34 +219,9 @@ func (t *JobItemGraph) ItemsNext2Scheduled() []*v1alpha1.Item {
 		}
 
 		if flag {
-			res = append(res, t.workNodes[itemName].item.DeepCopy())
+			res = append(res, t.workNodes[itemName].Item.DeepCopy())
 		}
 	}
 
 	return res
-}
-
-type itemNode struct {
-	item  *v1alpha1.Item
-	child []*itemNode
-}
-
-func (n *itemNode) children() []*itemNode {
-	return n.child
-}
-
-func (n *itemNode) isFirst() bool {
-	if len(n.item.RunAfter) == 0 {
-		return true
-	}
-
-	return false
-}
-
-func (n *itemNode) isLast() bool {
-	if len(n.child) == 0 {
-		return true
-	}
-
-	return false
 }

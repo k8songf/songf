@@ -9,14 +9,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	appsv1alpha1 "songf.sh/songf/pkg/api/apps.songf.sh/v1alpha1"
-	"songf.sh/songf/pkg/api/utils"
 	"songf.sh/songf/pkg/job_graph"
 	"volcano.sh/apis/pkg/apis/batch/v1alpha1"
 )
 
 func (c *jobCache) kubeJobHandler(ctx context.Context, object client.Object) []reconcile.Request {
 
-	jobName, _ := utils.GetJobNameAndItemNameFromObject(object)
+	jobName, _ := appsv1alpha1.GetJobNameAndItemNameFromObject(object)
 	if jobName == "" {
 		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
 		return nil
@@ -102,7 +101,7 @@ func (c *jobCache) kubeJobHandler(ctx context.Context, object client.Object) []r
 
 func (c *jobCache) vcJobHandler(ctx context.Context, object client.Object) []reconcile.Request {
 
-	jobName, _ := utils.GetJobNameAndItemNameFromObject(object)
+	jobName, _ := appsv1alpha1.GetJobNameAndItemNameFromObject(object)
 	if jobName == "" {
 		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
 		return nil
@@ -146,7 +145,7 @@ func (c *jobCache) vcJobHandler(ctx context.Context, object client.Object) []rec
 
 func (c *jobCache) serviceHandler(ctx context.Context, object client.Object) []reconcile.Request {
 
-	jobName, _ := utils.GetJobNameAndItemNameFromObject(object)
+	jobName, _ := appsv1alpha1.GetJobNameAndItemNameFromObject(object)
 	if jobName == "" {
 		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
 		return nil
@@ -205,7 +204,7 @@ func (c *jobCache) serviceHandler(ctx context.Context, object client.Object) []r
 
 func (c *jobCache) configmapHandler(ctx context.Context, object client.Object) []reconcile.Request {
 
-	jobName, _ := utils.GetJobNameAndItemNameFromObject(object)
+	jobName, _ := appsv1alpha1.GetJobNameAndItemNameFromObject(object)
 	if jobName == "" {
 		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
 		return nil
@@ -262,7 +261,7 @@ func (c *jobCache) configmapHandler(ctx context.Context, object client.Object) [
 
 func (c *jobCache) secretHandler(ctx context.Context, object client.Object) []reconcile.Request {
 
-	jobName, _ := utils.GetJobNameAndItemNameFromObject(object)
+	jobName, _ := appsv1alpha1.GetJobNameAndItemNameFromObject(object)
 	if jobName == "" {
 		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
 		return nil
@@ -319,7 +318,7 @@ func (c *jobCache) secretHandler(ctx context.Context, object client.Object) []re
 
 func (c *jobCache) pvcHandler(ctx context.Context, object client.Object) []reconcile.Request {
 
-	jobName, _ := utils.GetJobNameAndItemNameFromObject(object)
+	jobName, _ := appsv1alpha1.GetJobNameAndItemNameFromObject(object)
 	if jobName == "" {
 		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
 		return nil
@@ -383,7 +382,7 @@ func (c *jobCache) pvcHandler(ctx context.Context, object client.Object) []recon
 
 func (c *jobCache) pvHandler(ctx context.Context, object client.Object) []reconcile.Request {
 
-	jobName, _ := utils.GetJobNameAndItemNameFromObject(object)
+	jobName, _ := appsv1alpha1.GetJobNameAndItemNameFromObject(object)
 	if jobName == "" {
 		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
 		return nil

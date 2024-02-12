@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	appsv1alpha1 "songf.sh/songf/pkg/api/apps.songf.sh/v1alpha1"
-	"songf.sh/songf/pkg/api/utils"
 	"volcano.sh/apis/pkg/apis/batch/v1alpha1"
 )
 
@@ -162,12 +161,12 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 	}
 
 	baseAnnotations := job.Annotations
-	baseAnnotations[utils.CreateByJob] = job.Name
-	baseAnnotations[utils.CreateByJobItem] = item.Name
+	baseAnnotations[appsv1alpha1.CreateByJob] = job.Name
+	baseAnnotations[appsv1alpha1.CreateByJobItem] = item.Name
 
 	baseLabels := job.Labels
-	baseLabels[utils.CreateByJob] = job.Name
-	baseLabels[utils.CreateByJobItem] = item.Name
+	baseLabels[appsv1alpha1.CreateByJob] = job.Name
+	baseLabels[appsv1alpha1.CreateByJobItem] = item.Name
 
 	expendAnnotationFn := func(extend map[string]string) map[string]string {
 		res := map[string]string{}
@@ -218,7 +217,7 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 			return fmt.Errorf("%s k8s itemJob and volcano itemJob can not be total exists", itemJob.Name)
 		}
 
-		jobName := utils.CalJobItemSubName(job.Name, item.Name, itemJob.Name)
+		jobName := appsv1alpha1.CalJobItemSubName(job.Name, item.Name, itemJob.Name)
 		jobObjectMeta := metav1.ObjectMeta{
 			Name:            jobName,
 			OwnerReferences: ownerReference,
@@ -253,7 +252,7 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 
 	for _, service := range item.ItemModules.Services {
 
-		serviceName := utils.CalJobItemSubName(job.Name, item.Name, service.Name)
+		serviceName := appsv1alpha1.CalJobItemSubName(job.Name, item.Name, service.Name)
 
 		serviceObjectMeta := metav1.ObjectMeta{
 			Name:            serviceName,
@@ -277,7 +276,7 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 
 	for _, cm := range item.ItemModules.ConfigMaps {
 
-		cmName := utils.CalJobItemSubName(job.Name, item.Name, cm.ConfigMap.Name)
+		cmName := appsv1alpha1.CalJobItemSubName(job.Name, item.Name, cm.ConfigMap.Name)
 
 		cmImpl := cm.ConfigMap.DeepCopy()
 
@@ -296,7 +295,7 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 
 	for _, secret := range item.ItemModules.Secrets {
 
-		secretName := utils.CalJobItemSubName(job.Name, item.Name, secret.Secret.Name)
+		secretName := appsv1alpha1.CalJobItemSubName(job.Name, item.Name, secret.Secret.Name)
 
 		secretImpl := secret.Secret.DeepCopy()
 
@@ -315,7 +314,7 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 
 	for _, pv := range item.ItemModules.Pvs {
 
-		pvName := utils.CalJobItemSubName(job.Name, item.Name, pv.Name)
+		pvName := appsv1alpha1.CalJobItemSubName(job.Name, item.Name, pv.Name)
 
 		pvObjectMeta := metav1.ObjectMeta{
 			Name:            pvName,
@@ -339,7 +338,7 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 
 	for _, pvc := range item.ItemModules.Pvcs {
 
-		pvcName := utils.CalJobItemSubName(job.Name, item.Name, pvc.Name)
+		pvcName := appsv1alpha1.CalJobItemSubName(job.Name, item.Name, pvc.Name)
 
 		pvcObjectMeta := metav1.ObjectMeta{
 			Name:            pvcName,
@@ -374,7 +373,7 @@ func (r *JobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}
 
 		annotations := obj.GetAnnotations()
-		_, ok := annotations[utils.CreateByJob]
+		_, ok := annotations[appsv1alpha1.CreateByJob]
 		return ok
 	})
 
