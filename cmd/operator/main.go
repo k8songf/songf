@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	appsv1alpha1 "songf.sh/songf/api/v1alpha1"
+	appsv1alpha1 "songf.sh/songf/pkg/api/apps.songf.sh/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 

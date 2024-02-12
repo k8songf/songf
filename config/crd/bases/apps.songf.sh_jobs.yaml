@@ -50,12 +50,6 @@ spec:
                       description: ItemJobs defines the jobs scheduled in this Item,
                         including volcano job and kube job.
                       properties:
-                        containerExtend:
-                          description: If set, the container of all item jobs will
-                            be replaced by the field. For example, set this filed
-                            "a->b", it means the jobs containers will be replaced
-                            by Job with name "b" that in Item with name "a".
-                          type: string
                         jobs:
                           description: Jobs to create, the names of job must be unique.
                           items:
@@ -13256,6 +13250,10 @@ spec:
                                       type: object
                                     type: array
                                 type: object
+                              annotations:
+                                additionalProperties:
+                                  type: string
+                                type: object
                               containerExtend:
                                 description: If set, the container of the job will
                                   be replaced by the field. For example, set this
@@ -24099,10 +24097,12 @@ spec:
                                 required:
                                 - template
                                 type: object
-                              metadata:
-                                description: 'Standard object''s metadata of the jobs
-                                  created from this template. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata'
+                              labels:
+                                additionalProperties:
+                                  type: string
                                 type: object
+                              name:
+                                type: string
                               nodeNameExtend:
                                 description: If set, the pod of job will run on the
                                   node depends on the field. For example, set this
@@ -24128,6 +24128,10 @@ spec:
                             description: ConfigMapTemplate defines the configmap to
                               create in Item, detailed information.
                             properties:
+                              annotations:
+                                additionalProperties:
+                                  type: string
+                                type: object
                               configMap:
                                 description: ConfigMap holds configuration data for
                                   pods to consume.
@@ -24182,6 +24186,12 @@ spec:
                                       info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata'
                                     type: object
                                 type: object
+                              labels:
+                                additionalProperties:
+                                  type: string
+                                type: object
+                              name:
+                                type: string
                               ttlSecondsAfterFinished:
                                 description: ttlSecondsAfterFinished limits the lifetime
                                   of a Job that has finished execution (either Completed
@@ -24201,8 +24211,16 @@ spec:
                             description: PvcTemplate defines the pvc to create in
                               Item, detailed information.
                             properties:
-                              metadata:
+                              annotations:
+                                additionalProperties:
+                                  type: string
                                 type: object
+                              labels:
+                                additionalProperties:
+                                  type: string
+                                type: object
+                              name:
+                                type: string
                               pvc:
                                 description: PersistentVolumeClaimSpec describes the
                                   common attributes of storage devices and allows
@@ -24461,8 +24479,16 @@ spec:
                             description: PvTemplate defines the pv to create in Item,
                               detailed information.
                             properties:
-                              metadata:
+                              annotations:
+                                additionalProperties:
+                                  type: string
                                 type: object
+                              labels:
+                                additionalProperties:
+                                  type: string
+                                type: object
+                              name:
+                                type: string
                               pvc:
                                 description: PersistentVolumeSpec is the specification
                                   of a persistent volume.
@@ -25693,6 +25719,16 @@ spec:
                             description: SecretTemplate defines the secret to create
                               in Item, detailed information.
                             properties:
+                              annotations:
+                                additionalProperties:
+                                  type: string
+                                type: object
+                              labels:
+                                additionalProperties:
+                                  type: string
+                                type: object
+                              name:
+                                type: string
                               secret:
                                 description: Secret holds secret data of a certain
                                   type. The total bytes of the values in the Data
@@ -25769,8 +25805,16 @@ spec:
                             description: ServiceTemplate defines the service to create
                               in Item, detailed information.
                             properties:
-                              metadata:
+                              annotations:
+                                additionalProperties:
+                                  type: string
                                 type: object
+                              labels:
+                                additionalProperties:
+                                  type: string
+                                type: object
+                              name:
+                                type: string
                               spec:
                                 description: Specification of the desired behavior
                                   of the volcano job, including the minAvailable

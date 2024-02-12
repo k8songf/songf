@@ -276,12 +276,12 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 
 	for _, cm := range item.ItemModules.ConfigMaps {
 
-		cmName := appsv1alpha1.CalJobItemSubName(job.Name, item.Name, cm.ConfigMap.Name)
+		cmName := appsv1alpha1.CalJobItemSubName(job.Name, item.Name, cm.Name)
 
 		cmImpl := cm.ConfigMap.DeepCopy()
 
-		cmImpl.Labels = expendLabelFn(cm.ConfigMap.Labels)
-		cmImpl.Annotations = expendAnnotationFn(cm.ConfigMap.Annotations)
+		cmImpl.Labels = expendLabelFn(cm.Labels)
+		cmImpl.Annotations = expendAnnotationFn(cm.Annotations)
 		cmImpl.OwnerReferences = ownerReference
 		cmImpl.Name = cmName
 
@@ -295,12 +295,12 @@ func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job
 
 	for _, secret := range item.ItemModules.Secrets {
 
-		secretName := appsv1alpha1.CalJobItemSubName(job.Name, item.Name, secret.Secret.Name)
+		secretName := appsv1alpha1.CalJobItemSubName(job.Name, item.Name, secret.Name)
 
 		secretImpl := secret.Secret.DeepCopy()
 
-		secretImpl.Labels = expendLabelFn(secret.Secret.Labels)
-		secretImpl.Annotations = expendAnnotationFn(secret.Secret.Annotations)
+		secretImpl.Labels = expendLabelFn(secret.Labels)
+		secretImpl.Annotations = expendAnnotationFn(secret.Annotations)
 		secretImpl.OwnerReferences = ownerReference
 		secretImpl.Name = secretName
 
