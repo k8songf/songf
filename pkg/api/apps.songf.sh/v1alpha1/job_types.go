@@ -85,7 +85,7 @@ type Item struct {
 	// Default to false.
 	// If set true, this Item and its child Items won't participate in the scheduling of taskflow
 	// +optional
-	Truncated bool `json:"truncated,omitempty" protobuf:"varint,2,opt,name=truncated"`
+	Truncated *bool `json:"truncated,omitempty" protobuf:"varint,2,opt,name=truncated"`
 
 	// RunAfter defines the timing of this Item can be scheduled.
 	// When Items with name set in this field Success, this Item will start to run.

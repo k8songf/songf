@@ -2,6 +2,7 @@ package job_graph
 
 import (
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -13,9 +14,10 @@ import (
 type JobItemGraph struct {
 	sync.RWMutex
 
-	Name      string
-	Uuid      types.UID
-	NameSpace string
+	Name            string
+	Uuid            types.UID
+	NameSpace       string
+	DeleteTimestamp *metav1.Time
 
 	startItemNode *v1alpha1.ItemNode
 
@@ -32,11 +34,38 @@ func NewJobItemGraph() *JobItemGraph {
 	}
 }
 
-func (t *JobItemGraph) GetStartItem() (*v1alpha1.Item, bool) {
+func (t *JobItemGraph) GetStartItemNode() (*v1alpha1.ItemNode, bool) {
 	if t.startItemNode == nil || t.startItemNode.Item == nil {
 		return nil, false
 	}
-	return t.startItemNode.Item, true
+	return t.startItemNode, true
+}
+
+func (t *JobItemGraph) GetItemStatus(itemName string) (*v1alpha1.ItemStatus, bool) {
+
+	t.Lock()
+	defer t.Unlock()
+
+	status, ok := t.itemStatus[itemName]
+	if !ok {
+		return nil, false
+	}
+
+	return status.DeepCopy(), true
+}
+
+func (t *JobItemGraph) GetAllItemStatus() map[string]*v1alpha1.ItemStatus {
+
+	t.Lock()
+	defer t.Unlock()
+
+	res := map[string]*v1alpha1.ItemStatus{}
+
+	for k, v := range t.itemStatus {
+		res[k] = v.DeepCopy()
+	}
+
+	return res
 }
 
 func (t *JobItemGraph) SyncFromJob(job *v1alpha1.Job) error {
@@ -46,6 +75,10 @@ func (t *JobItemGraph) SyncFromJob(job *v1alpha1.Job) error {
 	t.Name = job.Name
 	t.Uuid = job.UID
 	t.NameSpace = job.Namespace
+	if job.DeletionTimestamp != nil {
+		t.DeleteTimestamp = new(metav1.Time)
+		*t.DeleteTimestamp = *job.DeletionTimestamp
+	}
 
 	for _, item := range job.Spec.Items {
 		_, ok := t.itemStatus[item.Name]
@@ -62,7 +95,7 @@ func (t *JobItemGraph) SyncFromJob(job *v1alpha1.Job) error {
 				}
 			} else {
 				status := job.Status.ItemStatus[item.Name]
-				t.itemStatus[item.Name] = &status
+				t.itemStatus[item.Name] = status.DeepCopy()
 			}
 		}
 
@@ -71,10 +104,6 @@ func (t *JobItemGraph) SyncFromJob(job *v1alpha1.Job) error {
 	t.startItemNode, t.workNodes, err = v1alpha1.NewGraphFromJob(job)
 	if err != nil {
 		return err
-	}
-
-	if !v1alpha1.IsJobHasCycleDfs(t.startItemNode, map[string]bool{}) {
-		return fmt.Errorf("job %s is not a directed acyclic graph", job.Name)
 	}
 
 	return nil
@@ -213,6 +242,11 @@ func (t *JobItemGraph) ItemsNext2Scheduled() []*v1alpha1.Item {
 			}
 
 			if status.Phase != v1alpha1.ItemCompleted {
+				flag = false
+				break
+			}
+
+			if t.workNodes[itemName].Item.Truncated != nil && *t.workNodes[itemName].Item.Truncated {
 				flag = false
 				break
 			}

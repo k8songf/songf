@@ -11,7 +11,7 @@ import (
 
 func Run(opt ServerOption) error {
 
-	controller.InitializeCache()
+	//controller.InitializeCache()
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 opt.Scheme,

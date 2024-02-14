@@ -35,6 +35,10 @@ func IsJobItemValid(job *Job) (bool, string) {
 		}
 
 		if len(item.RunAfter) == 0 {
+			if item.Truncated != nil && *item.Truncated == true {
+				return false, "start item can not truncate"
+			}
+
 			fatherNum++
 		}
 

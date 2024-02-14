@@ -17,10 +17,8 @@ func NewGraphFromJob(job *Job) (*ItemNode, map[string]*ItemNode, error) {
 			return nil, nil, fmt.Errorf("new job item tree build err: item Name %s repeated", item.Name)
 		}
 
-		var itemImpl *Item
-		itemImpl = &item
 		nodeMap[item.Name] = &ItemNode{
-			Item: itemImpl,
+			Item: item.DeepCopy(),
 		}
 
 		if len(item.RunAfter) == 0 {
