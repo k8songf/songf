@@ -27,15 +27,20 @@ func (c *jobCache) syncGraphFromJob(job *appsv1alpha1.Job) error {
 	c.Lock()
 	defer c.Unlock()
 
-	graph, ok := c.jobItemGraphCache[job.Name]
-	if !ok {
-		graph = job_graph.NewJobItemGraph()
+	switch job.Status.State.Phase {
+	case appsv1alpha1.Terminated:
+		delete(c.jobItemGraphCache, job.Name)
+	default:
+		graph, ok := c.jobItemGraphCache[job.Name]
+		if !ok {
+			graph = job_graph.NewJobItemGraph()
+		}
+		if err := graph.SyncFromJob(job); err != nil {
+			return err
+		}
+		graph.SyncStatusPhase()
+		c.jobItemGraphCache[job.Name] = graph
 	}
-	if err := graph.SyncFromJob(job); err != nil {
-		return err
-	}
-	graph.SyncStatusPhase()
-	c.jobItemGraphCache[job.Name] = graph
 
 	return nil
 }
