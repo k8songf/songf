@@ -85,13 +85,12 @@ type Item struct {
 	// Default to false.
 	// If set true, this Item and its child Items won't participate in the scheduling of taskflow
 	// +optional
-	Truncated bool `json:"truncated,omitempty" protobuf:"varint,2,opt,name=truncated"`
+	Truncated *bool `json:"truncated,omitempty" protobuf:"varint,2,opt,name=truncated"`
 
 	// RunAfter defines the timing of this Item can be scheduled.
 	// When Items with name set in this field Success, this Item will start to run.
 	// If set null, this Item will be the first one. Only one Item can set this field null.
 	// +optional
-	// +kubebuilder:validation:UniqueItems=true
 	RunAfter []string `json:"runAfter,omitempty" protobuf:"bytes,3,opt,name=runAfter"`
 
 	// ItemJobs defines the jobs scheduled in this Item, including volcano job and kube job.
@@ -106,15 +105,9 @@ type Item struct {
 // ItemJobResource defines the jobs to create in Item
 type ItemJobResource struct {
 
-	// If set, the container of all item jobs will be replaced by the field.
-	// For example, set this filed "a->b", it means the jobs containers will be replaced by Job with
-	// name "b" that in Item with name "a".
-	// +optional
-	ContainerExtend *string `json:"containerExtend,omitempty" protobuf:"bytes,1,opt,name=containerExtend"`
-
 	// Jobs to create, the names of job must be unique.
 	// +optional
-	Jobs []ItemJobTemplate `json:"jobs,omitempty" protobuf:"bytes,2,opt,name=jobs"`
+	Jobs []ItemJobTemplate `json:"jobs,omitempty" protobuf:"bytes,1,opt,name=jobs"`
 }
 
 // ItemModuleResource defines the modules to create in Item
@@ -140,20 +133,27 @@ type ItemModuleResource struct {
 	// secrets to create, names can not be repeated
 	// +optional
 	Secrets []SecretTemplate `json:"secrets,omitempty" protobuf:"bytes,4,opt,name=secrets"`
+
+	// pvcs to create, names can not be repeated
+	// +optional
+	Pvcs []PvcTemplate `json:"pvcs,omitempty" protobuf:"bytes,5,opt,name=pvcs"`
+
+	// pvs to create, names can not be repeated
+	// +optional
+	Pvs []PvTemplate `json:"pvs,omitempty" protobuf:"bytes,6,opt,name=pvs"`
 }
 
 // ItemJobTemplate defines the jobs to create in Item, detailed information. KubeJobSpec and VolcanoJobSpec only one exist.
 type ItemJobTemplate struct {
-	// Standard object's metadata of the jobs created from this template.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+
 	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	TemplateBaseInfo `json:",inline"`
 
 	// If set, the container of the job will be replaced by the field.
 	// For example, set this filed "a->b", it means the job's container will be replaced by Job with
 	// name "b" that in Item with name "a".
 	// +optional
-	ContainerExtend *string `json:"containerExtend,omitempty" protobuf:"bytes,2,opt,name=containerExtend"`
+	ContainerExtend *string `json:"containerExtend,omitempty" protobuf:"bytes,1,opt,name=containerExtend"`
 
 	// If set, the pod of job will run on the node depends on the field.
 	// For example, set this filed "a->b", it means the job's pods will run on the node that KubeJob with
@@ -162,28 +162,28 @@ type ItemJobTemplate struct {
 	// name "b" that in Item with name "a" and has Task named "c" last finished.
 	// If set, the follow job will only be allowed to run one task and one pod.
 	// +optional
-	NodeNameExtend *string `json:"nodeNameExtend,omitempty" protobuf:"bytes,3,opt,name=nodeNameExtend"`
+	NodeNameExtend *string `json:"nodeNameExtend,omitempty" protobuf:"bytes,2,opt,name=nodeNameExtend"`
 
 	// Save container. If set true, job's container will be saved.
 	// If other Item extend this job's container, will be auto set true.
 	// +optional
-	ContainerSave bool `json:"containerSave,omitempty" protobuf:"varint,4,opt,name=containerSave"`
+	ContainerSave bool `json:"containerSave,omitempty" protobuf:"varint,3,opt,name=containerSave"`
 
 	// Specification of the desired behavior of the job.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
-	KubeJobSpec *batchv1.JobSpec `json:"kubeJobSpec,omitempty" protobuf:"bytes,5,opt,name=kubeJobSpec"`
+	KubeJobSpec *batchv1.JobSpec `json:"kubeJobSpec,omitempty" protobuf:"bytes,4,opt,name=kubeJobSpec"`
 
 	// Specification of the desired behavior of the volcano job, including the minAvailable
 	// +optional
-	VolcanoJobSpec *v1alpha1.JobSpec `json:"VolcanoJobSpec,omitempty" protobuf:"bytes,6,opt,name=VolcanoJobSpec"`
+	VolcanoJobSpec *v1alpha1.JobSpec `json:"VolcanoJobSpec,omitempty" protobuf:"bytes,5,opt,name=VolcanoJobSpec"`
 }
 
 // ServiceTemplate defines the service to create in Item, detailed information.
 type ServiceTemplate struct {
 
 	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	TemplateBaseInfo `json:",inline"`
 
 	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
 	// execution (either Completed or Failed). If this field is set,
@@ -192,15 +192,18 @@ type ServiceTemplate struct {
 	// the Job won't be automatically deleted. If this field is set to zero,
 	// the Job becomes eligible to be deleted immediately after it finishes.
 	// +optional
-	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,2,opt,name=ttlSecondsAfterFinished"`
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,1,opt,name=ttlSecondsAfterFinished"`
 
 	// Specification of the desired behavior of the volcano job, including the minAvailable
 	// +optional
-	Spec corev1.ServiceSpec `json:"spec,omitempty" protobuf:"bytes,3,opt,name=spec"`
+	Spec corev1.ServiceSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
 // ConfigMapTemplate defines the configmap to create in Item, detailed information.
 type ConfigMapTemplate struct {
+
+	// +optional
+	TemplateBaseInfo `json:",inline"`
 
 	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
 	// execution (either Completed or Failed). If this field is set,
@@ -218,6 +221,9 @@ type ConfigMapTemplate struct {
 // SecretTemplate defines the secret to create in Item, detailed information.
 type SecretTemplate struct {
 
+	// +optional
+	TemplateBaseInfo `json:",inline"`
+
 	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
 	// execution (either Completed or Failed). If this field is set,
 	// ttlSecondsAfterFinished after the Job finishes, this secret will be
@@ -229,6 +235,55 @@ type SecretTemplate struct {
 
 	// +optional
 	Secret corev1.Secret `json:"secret,omitempty" protobuf:"bytes,2,opt,name=secret"`
+}
+
+// PvcTemplate defines the pvc to create in Item, detailed information.
+type PvcTemplate struct {
+
+	// +optional
+	TemplateBaseInfo `json:",inline"`
+
+	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
+	// execution (either Completed or Failed). If this field is set,
+	// ttlSecondsAfterFinished after the Job finishes, this secret will be
+	// automatically deleted. If this field is unset,
+	// the Job won't be automatically deleted. If this field is set to zero,
+	// the Job becomes eligible to be deleted immediately after it finishes.
+	// +optional
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,1,opt,name=ttlSecondsAfterFinished"`
+
+	// +optional
+	Pvc corev1.PersistentVolumeClaimSpec `json:"pvc,omitempty" protobuf:"bytes,2,opt,name=pvc"`
+}
+
+// PvTemplate defines the pv to create in Item, detailed information.
+type PvTemplate struct {
+
+	// +optional
+	TemplateBaseInfo `json:",inline"`
+
+	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
+	// execution (either Completed or Failed). If this field is set,
+	// ttlSecondsAfterFinished after the Job finishes, this secret will be
+	// automatically deleted. If this field is unset,
+	// the Job won't be automatically deleted. If this field is set to zero,
+	// the Job becomes eligible to be deleted immediately after it finishes.
+	// +optional
+	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,1,opt,name=ttlSecondsAfterFinished"`
+
+	// +optional
+	Pv corev1.PersistentVolumeSpec `json:"pvc,omitempty" protobuf:"bytes,2,opt,name=pv"`
+}
+
+type TemplateBaseInfo struct {
+	// +optional
+	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
+
+	// +optional
+	Labels map[string]string `json:"labels,omitempty" protobuf:"bytes,2,rep,name=labels"`
+
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty" protobuf:"bytes,3,rep,name=annotations"`
 }
 
 // JobPhase defines the phase of the job.
@@ -311,6 +366,12 @@ type ItemStatus struct {
 	// The status of secret, key is secret name.
 	// +optional
 	SecretStatus map[string]RegularModuleStatus `json:"secretStatus,omitempty" protobuf:"bytes,9,opt,name=secretStatus"`
+
+	// +optional
+	PvcStatus map[string]RegularModuleStatus `json:"pvcStatus,omitempty" protobuf:"bytes,9,opt,name=pvcStatus"`
+
+	// +optional
+	PvStatus map[string]RegularModuleStatus `json:"pvStatus,omitempty" protobuf:"bytes,9,opt,name=pvStatus"`
 }
 
 // RegularModulePhase defines the phase of regular module.

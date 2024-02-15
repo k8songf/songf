@@ -10,7 +10,7 @@ set -o pipefail
 MODULE=songf.sh/songf
 
 #api包
-APIS_PKG=api
+#APIS_PKG=api
 NEW_APIS_PKG=pkg/api
 
 #代码生出输出，生成Resource时指定的group一样
@@ -25,7 +25,7 @@ SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo ../code-generator)}
 
 # kubebuilder2.3.2版本生成的api目录结构code-generator无法直接使用
-rm -rf "${NEW_APIS_PKG}/${GROUP}/${VERSION}" && mkdir -p "${NEW_APIS_PKG}/${GROUP}/${VERSION}" && cp -r "${APIS_PKG}/${VERSION}/" "${NEW_APIS_PKG}/${GROUP}/${VERSION}"
+#rm -rf "${NEW_APIS_PKG}/${GROUP}/${VERSION}" && mkdir -p "${NEW_APIS_PKG}/${GROUP}/${VERSION}" && cp -r "${APIS_PKG}/${VERSION}/" "${NEW_APIS_PKG}/${GROUP}/${VERSION}"
 
 # generate the code with:
 # --output-base    because this script should also be able to run inside the vendor dir of

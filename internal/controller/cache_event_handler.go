@@ -9,12 +9,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	appsv1alpha1 "songf.sh/songf/pkg/api/apps.songf.sh/v1alpha1"
+	"songf.sh/songf/pkg/job_graph"
 	"volcano.sh/apis/pkg/apis/batch/v1alpha1"
 )
 
 func (c *jobCache) kubeJobHandler(ctx context.Context, object client.Object) []reconcile.Request {
 
-	jobName, _ := getJobNameAndItemNameFromObject(object)
+	jobName, _ := appsv1alpha1.GetJobNameAndItemNameFromObject(object)
 	if jobName == "" {
 		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
 		return nil
@@ -29,9 +30,9 @@ func (c *jobCache) kubeJobHandler(ctx context.Context, object client.Object) []r
 	c.Lock()
 	defer c.Unlock()
 
-	tree, ok := c.jobItemTreeCache[jobName]
+	graph, ok := c.jobItemGraphCache[jobName]
 	if !ok {
-		tree = newJobItemTree()
+		graph = job_graph.NewJobItemGraph()
 	}
 
 	fn := func(status *appsv1alpha1.ItemStatus) {
@@ -80,18 +81,18 @@ func (c *jobCache) kubeJobHandler(ctx context.Context, object client.Object) []r
 
 	}
 
-	if err := tree.syncFromObject(job, fn); err != nil {
-		klog.Errorf("%s/%s sync tree from cache err: %s", job.Namespace, job.Name, err.Error())
+	if err := graph.SyncFromObject(job, fn); err != nil {
+		klog.Errorf("%s/%s sync graph from cache err: %s", job.Namespace, job.Name, err.Error())
 		return nil
 	}
 
-	c.jobItemTreeCache[jobName] = tree
+	c.jobItemGraphCache[jobName] = graph
 
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
-				Name:      tree.name,
-				Namespace: tree.nameSpace,
+				Name:      graph.Name,
+				Namespace: graph.NameSpace,
 			},
 		},
 	}
@@ -100,7 +101,7 @@ func (c *jobCache) kubeJobHandler(ctx context.Context, object client.Object) []r
 
 func (c *jobCache) vcJobHandler(ctx context.Context, object client.Object) []reconcile.Request {
 
-	jobName, _ := getJobNameAndItemNameFromObject(object)
+	jobName, _ := appsv1alpha1.GetJobNameAndItemNameFromObject(object)
 	if jobName == "" {
 		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
 		return nil
@@ -115,27 +116,27 @@ func (c *jobCache) vcJobHandler(ctx context.Context, object client.Object) []rec
 	c.Lock()
 	defer c.Unlock()
 
-	tree, ok := c.jobItemTreeCache[jobName]
+	graph, ok := c.jobItemGraphCache[jobName]
 	if !ok {
-		tree = newJobItemTree()
+		graph = job_graph.NewJobItemGraph()
 	}
 
 	fn := func(status *appsv1alpha1.ItemStatus) {
 		status.JobStatus[job.Name] = job.Status.State
 	}
 
-	if err := tree.syncFromObject(job, fn); err != nil {
-		klog.Errorf("%s/%s sync tree from cache err: %s", job.Namespace, job.Name, err.Error())
+	if err := graph.SyncFromObject(job, fn); err != nil {
+		klog.Errorf("%s/%s sync graph from cache err: %s", job.Namespace, job.Name, err.Error())
 		return nil
 	}
 
-	c.jobItemTreeCache[jobName] = tree
+	c.jobItemGraphCache[jobName] = graph
 
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
-				Name:      tree.name,
-				Namespace: tree.nameSpace,
+				Name:      graph.Name,
+				Namespace: graph.NameSpace,
 			},
 		},
 	}
@@ -144,7 +145,7 @@ func (c *jobCache) vcJobHandler(ctx context.Context, object client.Object) []rec
 
 func (c *jobCache) serviceHandler(ctx context.Context, object client.Object) []reconcile.Request {
 
-	jobName, _ := getJobNameAndItemNameFromObject(object)
+	jobName, _ := appsv1alpha1.GetJobNameAndItemNameFromObject(object)
 	if jobName == "" {
 		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
 		return nil
@@ -159,9 +160,9 @@ func (c *jobCache) serviceHandler(ctx context.Context, object client.Object) []r
 	c.Lock()
 	defer c.Unlock()
 
-	tree, ok := c.jobItemTreeCache[jobName]
+	graph, ok := c.jobItemGraphCache[jobName]
 	if !ok {
-		tree = newJobItemTree()
+		graph = job_graph.NewJobItemGraph()
 	}
 
 	fn := func(status *appsv1alpha1.ItemStatus) {
@@ -183,18 +184,18 @@ func (c *jobCache) serviceHandler(ctx context.Context, object client.Object) []r
 		status.ServiceStatus[service.Name] = serviceStatus
 	}
 
-	if err := tree.syncFromObject(service, fn); err != nil {
-		klog.Errorf("%s/%s sync tree from cache err: %s", service.Namespace, service.Name, err.Error())
+	if err := graph.SyncFromObject(service, fn); err != nil {
+		klog.Errorf("%s/%s sync graph from cache err: %s", service.Namespace, service.Name, err.Error())
 		return nil
 	}
 
-	c.jobItemTreeCache[jobName] = tree
+	c.jobItemGraphCache[jobName] = graph
 
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
-				Name:      tree.name,
-				Namespace: tree.nameSpace,
+				Name:      graph.Name,
+				Namespace: graph.NameSpace,
 			},
 		},
 	}
@@ -203,7 +204,7 @@ func (c *jobCache) serviceHandler(ctx context.Context, object client.Object) []r
 
 func (c *jobCache) configmapHandler(ctx context.Context, object client.Object) []reconcile.Request {
 
-	jobName, _ := getJobNameAndItemNameFromObject(object)
+	jobName, _ := appsv1alpha1.GetJobNameAndItemNameFromObject(object)
 	if jobName == "" {
 		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
 		return nil
@@ -218,9 +219,9 @@ func (c *jobCache) configmapHandler(ctx context.Context, object client.Object) [
 	c.Lock()
 	defer c.Unlock()
 
-	tree, ok := c.jobItemTreeCache[jobName]
+	graph, ok := c.jobItemGraphCache[jobName]
 	if !ok {
-		tree = newJobItemTree()
+		graph = job_graph.NewJobItemGraph()
 	}
 
 	fn := func(status *appsv1alpha1.ItemStatus) {
@@ -242,16 +243,16 @@ func (c *jobCache) configmapHandler(ctx context.Context, object client.Object) [
 		status.ServiceStatus[configmap.Name] = cmStatus
 	}
 
-	if err := tree.syncFromObject(configmap, fn); err != nil {
-		klog.Errorf("%s/%s sync tree from cache err: %s", configmap.Namespace, configmap.Name, err.Error())
+	if err := graph.SyncFromObject(configmap, fn); err != nil {
+		klog.Errorf("%s/%s sync graph from cache err: %s", configmap.Namespace, configmap.Name, err.Error())
 		return nil
 	}
 
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
-				Name:      tree.name,
-				Namespace: tree.nameSpace,
+				Name:      graph.Name,
+				Namespace: graph.NameSpace,
 			},
 		},
 	}
@@ -260,7 +261,7 @@ func (c *jobCache) configmapHandler(ctx context.Context, object client.Object) [
 
 func (c *jobCache) secretHandler(ctx context.Context, object client.Object) []reconcile.Request {
 
-	jobName, _ := getJobNameAndItemNameFromObject(object)
+	jobName, _ := appsv1alpha1.GetJobNameAndItemNameFromObject(object)
 	if jobName == "" {
 		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
 		return nil
@@ -268,16 +269,16 @@ func (c *jobCache) secretHandler(ctx context.Context, object client.Object) []re
 
 	secret, ok := object.(*corev1.Secret)
 	if !ok {
-		klog.Errorf("receive object %v/%v which is not configmap", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
+		klog.Errorf("receive object %v/%v which is not secret", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
 		return nil
 	}
 
 	c.Lock()
 	defer c.Unlock()
 
-	tree, ok := c.jobItemTreeCache[jobName]
+	graph, ok := c.jobItemGraphCache[jobName]
 	if !ok {
-		tree = newJobItemTree()
+		graph = job_graph.NewJobItemGraph()
 	}
 
 	fn := func(status *appsv1alpha1.ItemStatus) {
@@ -299,16 +300,144 @@ func (c *jobCache) secretHandler(ctx context.Context, object client.Object) []re
 		status.SecretStatus[secret.Name] = secretStatus
 	}
 
-	if err := tree.syncFromObject(secret, fn); err != nil {
-		klog.Errorf("%s/%s sync tree from cache err: %s", secret.Namespace, secret.Name, err.Error())
+	if err := graph.SyncFromObject(secret, fn); err != nil {
+		klog.Errorf("%s/%s sync graph from cache err: %s", secret.Namespace, secret.Name, err.Error())
 		return nil
 	}
 
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
-				Name:      tree.name,
-				Namespace: tree.nameSpace,
+				Name:      graph.Name,
+				Namespace: graph.NameSpace,
+			},
+		},
+	}
+
+}
+
+func (c *jobCache) pvcHandler(ctx context.Context, object client.Object) []reconcile.Request {
+
+	jobName, _ := appsv1alpha1.GetJobNameAndItemNameFromObject(object)
+	if jobName == "" {
+		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
+		return nil
+	}
+
+	pvc, ok := object.(*corev1.PersistentVolumeClaim)
+	if !ok {
+		klog.Errorf("receive object %v/%v which is not pvc", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
+		return nil
+	}
+
+	c.Lock()
+	defer c.Unlock()
+
+	graph, ok := c.jobItemGraphCache[jobName]
+	if !ok {
+		graph = job_graph.NewJobItemGraph()
+	}
+
+	fn := func(status *appsv1alpha1.ItemStatus) {
+		pvcStatus, ok := status.PvcStatus[pvc.Name]
+		if !ok {
+			pvcStatus = appsv1alpha1.RegularModuleStatus{
+				Phase: appsv1alpha1.RegularModuleUnknown,
+			}
+		}
+
+		if pvc.DeletionTimestamp == nil || pvc.DeletionTimestamp.IsZero() {
+
+			switch pvc.Status.Phase {
+			case corev1.ClaimPending:
+				pvcStatus.Phase = appsv1alpha1.RegularModuleCreating
+				pvcStatus.LastTransitionTime = pvc.CreationTimestamp
+			case corev1.ClaimBound:
+				pvcStatus.Phase = appsv1alpha1.RegularModuleCreating
+			case corev1.ClaimLost:
+				pvcStatus.Phase = appsv1alpha1.RegularModuleFailed
+			}
+		} else {
+			pvcStatus.Phase = appsv1alpha1.RegularModuleFailed
+			pvcStatus.LastTransitionTime = *pvc.DeletionTimestamp
+		}
+		status.SecretStatus[pvc.Name] = pvcStatus
+	}
+
+	if err := graph.SyncFromObject(pvc, fn); err != nil {
+		klog.Errorf("%s/%s sync graph from cache err: %s", pvc.Namespace, pvc.Name, err.Error())
+		return nil
+	}
+
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Name:      graph.Name,
+				Namespace: graph.NameSpace,
+			},
+		},
+	}
+
+}
+
+func (c *jobCache) pvHandler(ctx context.Context, object client.Object) []reconcile.Request {
+
+	jobName, _ := appsv1alpha1.GetJobNameAndItemNameFromObject(object)
+	if jobName == "" {
+		klog.Errorf("receive object %v/%v which is not belong job", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
+		return nil
+	}
+
+	pv, ok := object.(*corev1.PersistentVolume)
+	if !ok {
+		klog.Errorf("receive object %v/%v which is not pv", object.GetObjectKind().GroupVersionKind().Kind, object.GetName())
+		return nil
+	}
+
+	c.Lock()
+	defer c.Unlock()
+
+	graph, ok := c.jobItemGraphCache[jobName]
+	if !ok {
+		graph = job_graph.NewJobItemGraph()
+	}
+
+	fn := func(status *appsv1alpha1.ItemStatus) {
+		pvStatus, ok := status.PvStatus[pv.Name]
+		if !ok {
+			pvStatus = appsv1alpha1.RegularModuleStatus{
+				Phase: appsv1alpha1.RegularModuleUnknown,
+			}
+		}
+
+		if pv.DeletionTimestamp == nil || pv.DeletionTimestamp.IsZero() {
+
+			switch pv.Status.Phase {
+			case corev1.VolumePending, corev1.VolumeAvailable:
+				pvStatus.Phase = appsv1alpha1.RegularModuleCreating
+				pvStatus.LastTransitionTime = pv.CreationTimestamp
+			case corev1.VolumeBound:
+				pvStatus.Phase = appsv1alpha1.RegularModuleCreating
+			case corev1.VolumeFailed, corev1.VolumeReleased:
+				pvStatus.Phase = appsv1alpha1.RegularModuleFailed
+			}
+		} else {
+			pvStatus.Phase = appsv1alpha1.RegularModuleFailed
+			pvStatus.LastTransitionTime = *pv.DeletionTimestamp
+		}
+		status.SecretStatus[pv.Name] = pvStatus
+	}
+
+	if err := graph.SyncFromObject(pv, fn); err != nil {
+		klog.Errorf("%s/%s sync graph from cache err: %s", pv.Namespace, pv.Name, err.Error())
+		return nil
+	}
+
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Name:      graph.Name,
+				Namespace: graph.NameSpace,
 			},
 		},
 	}

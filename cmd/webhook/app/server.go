@@ -6,19 +6,26 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	"songf.sh/songf/internal/controller"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	hook "songf.sh/songf/internal/webhook"
 )
 
 func Run(opt ServerOption) error {
-
-	//controller.InitializeCache()
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 opt.Scheme,
 		Metrics:                metricsserver.Options{BindAddress: opt.MetricsAddr},
 		HealthProbeBindAddress: opt.ProbeAddr,
-		LeaderElection:         opt.EnableLeaderElection,
-		LeaderElectionID:       "a8278f16.songf.sh",
+		LeaderElection:         false,
+
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Host:         opt.ListenAddress,
+			Port:         opt.Port,
+			CertDir:      opt.CertDir,
+			CertName:     opt.CertName,
+			KeyName:      opt.KeyName,
+			ClientCAName: opt.ClientCAName,
+		}),
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -35,20 +42,15 @@ func Run(opt ServerOption) error {
 		return fmt.Errorf("%s:%s", err.Error(), "unable to start manager")
 	}
 
-	reconciler, err := controller.NewJobReconciler(mgr.GetClient(), mgr.GetScheme())
+	hookImpl, err := hook.NewJobWebHook()
 	if err != nil {
 		return err
 	}
 
-	if err = reconciler.SetupWithManager(mgr); err != nil {
-		return fmt.Errorf("%s:%s-%s-%s", err.Error(), "unable to create controller", "controller", "Job")
+	if err = hookImpl.SetupWebhookWithManager(mgr); err != nil {
+		return fmt.Errorf("%s:%s-%s-%s", err.Error(), "unable to create webhook", "webhook", "Job")
 	}
-	if err = (&controller.JobBatchReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		return fmt.Errorf("%s:%s-%s-%s", err.Error(), "unable to create controller", "controller", "JobBatch")
-	}
+
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -58,7 +60,7 @@ func Run(opt ServerOption) error {
 		return fmt.Errorf("%s:%s", err.Error(), "unable to set up ready check")
 	}
 
-	klog.Info("starting manager")
+	klog.Info("starting webhook")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		return fmt.Errorf("%s:%s", err.Error(), "problem running manager")
 	}

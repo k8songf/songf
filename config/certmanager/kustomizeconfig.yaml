@@ -1,0 +1,46 @@
+# This configuration is for teaching kustomize how to update name ref substitution
+nameReference:
+  - kind: Issuer
+    group: cert-manager.io
+    fieldSpecs:
+      - kind: Certificate
+        group: cert-manager.io
+        path: spec/issuerRef/name
+
+
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  creationTimestamp: "2022-11-22T03:08:44Z"
+  generation: 1
+  name: volcano-admission-service-jobs-validate
+  resourceVersion: "6341213"
+  uid: b23fd82b-832e-4ffb-97a8-6b14bd4ec542
+webhooks:
+  - admissionReviewVersions:
+      - v1beta1
+    clientConfig:
+      caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURUekNDQWplZ0F3SUJBZ0lVZXl1SFlXWEJ2SVpFcUl1dHI5YmRQZjNQWWdnd0RRWUpLb1pJaHZjTkFRRUwKQlFBd056RTFNRE1HQTFVRUF3d3NkbTlzWTJGdWJ5MWhaRzFwYzNOcGIyNHRjMlZ5ZG1salpTNTJiMnhqWVc1dgpMWE41YzNSbGJTNXpkbU13SGhjTk1qSXhNVEl5TURNd056STRXaGNOTXpJeE1URTVNRE13TnpJNFdqQTNNVFV3Ck13WURWUVFEREN4MmIyeGpZVzV2TFdGa2JXbHpjMmx2YmkxelpYSjJhV05sTG5admJHTmhibTh0YzNsemRHVnQKTG5OMll6Q0NBU0l3RFFZSktvWklodmNOQVFFQkJRQURnZ0VQQURDQ0FRb0NnZ0VCQU9ialkvc0E1V1VKa2RhRAo4V1loVXB1ck8yblk1MTZWaU1lbU16bUd5cDNGMUJ4UWdjTllwTzFLUHZkWUpyV3hJVnphbk90TVdFazFFa2RnClI3b1RYTlJ1enI4Snc2QzhjRU1nM3F3a0JoMVBGL2pSOTRUY2RoUDRUNkVRRnpiNWtScUE0bHRNMmQxMHRSRHgKMFcxQklnUnpuVzdBRUc2UFcyZncrN2ZNWTNQSzdPRkdOc0dnRmM2d2JQZHFHYzFYaEorUS96SDlRY2hBMVlYRQo2dTNDZ1VwZXltb0RZL21UbTkyVzV0cUpRWjRPQXVkRkhZTHlvWnhnY1B3T2UxVUprL09nNXowUFkvT2FLd0VqClVJb213LzFGZldzSmJoZFdFdmdnS2tFUVRGWG5Ba0syYXpINjQ3dHQ3WGx1YjZiUUI0dHRRb0drblhhcjJDSTEKMzl2VUROTUNBd0VBQWFOVE1GRXdIUVlEVlIwT0JCWUVGTi91Qjl5Qm50OW9wS3hTcmp4Q3NuOXI5Tnp5TUI4RwpBMVVkSXdRWU1CYUFGTi91Qjl5Qm50OW9wS3hTcmp4Q3NuOXI5Tnp5TUE4R0ExVWRFd0VCL3dRRk1BTUJBZjh3CkRRWUpLb1pJaHZjTkFRRUxCUUFEZ2dFQkFLZ1dlUTZzOGUwNFk4TmdkQlFuanI2T2tJUFZhMjAzcGEvUHdoWEEKbEg0aUJ3YnBPc2lyY3crYUJmR3R3ZjFtdlF5bi9RZi9oQnZxdGlmL01zTGg1OTFEejE1UVVqeHpiNzZaL1NIRgpCc2laeFI0STYvc2Z5bm03V3dncVF3anFxQVpoM3oyVTk3RDR5akdwTGU5RHdzdHFITnBVZ0VjQlIrMks0d2xVCjZyZExHWitLbVA4Mk5CZFlCeGtLN0sybE9qTWxEN1poODRGa3cxQzZiSnpxckNoMWQ5UFlEaDlDcmxaUG4rVE4KTGJ2VTIrTlVBc1F4alJqVGhrWGJNNW9tWW94TmQrQUhFRHFNckNWcmxobE5yS3kwd0JzOWhCVHhudDVGbEZicQpqL3JFQmk0ekpxOVNaWXpQZ2hHL016ZjhOc3FDb0JHUm5NaXdDNGJHU1o5SjVwbz0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+      service:
+        name: volcano-admission-service
+        namespace: volcano-system
+        path: /jobs/validate
+        port: 443
+    failurePolicy: Ignore
+    matchPolicy: Exact
+    name: validatejob.volcano.sh
+    namespaceSelector: { }
+    objectSelector: { }
+    rules:
+      - apiGroups:
+          - batch.volcano.sh
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - jobs
+        scope: '*'
+    sideEffects: Unknown
+    timeoutSeconds: 30

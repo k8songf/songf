@@ -22,7 +22,6 @@ import (
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -41,6 +40,7 @@ type JobReconciler struct {
 	// Clientset is a connection to the core kubernetes API
 	//KubeClient *kubernetes.Clientset
 	//VcClient   *vcclient.Clientset
+	Cache *jobCache
 
 	Scheme *runtime.Scheme
 }
@@ -51,6 +51,8 @@ func NewJobReconciler(client client.Client, scheme *runtime.Scheme) (*JobReconci
 		Client: client,
 		Scheme: scheme,
 	}
+
+	r.Cache = newJobCache()
 
 	//config, err := rest.InClusterConfig()
 	//if err != nil {
@@ -98,9 +100,46 @@ func (r *JobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}
 
 	// sync cache
-	if err := Cache.syncJobTree(job); err != nil {
+	if err := r.Cache.syncGraphFromJob(job); err != nil {
 		klog.Errorf("add job to tree cache err: %s", err.Error())
-		return ctrl.Result{}, fmt.Errorf("reconcile get job err: %s", err.Error())
+		return ctrl.Result{}, fmt.Errorf("reconcile job err: %s", err.Error())
+	}
+
+	// if job was deleted, sync logic
+	deletedFlag, err := r.Cache.isJobDeleted(job.Name)
+	if err != nil {
+		klog.Errorf(err.Error())
+		return ctrl.Result{}, fmt.Errorf("reconcile job err: %s", err.Error())
+	}
+	if deletedFlag {
+		switch job.Status.State.Phase {
+		case appsv1alpha1.Terminating:
+			job.Status.State.Phase = appsv1alpha1.Terminated
+			job.Status.State.Message = "job deleted"
+			if err := r.updateJobStatus(context.Background(), job); err != nil {
+				klog.Errorf(err.Error())
+				return ctrl.Result{}, fmt.Errorf("reconcile job err: %s", err.Error())
+			}
+
+			return ctrl.Result{}, nil
+		case appsv1alpha1.Terminated:
+			if err := r.deleteJob(context.Background(), job); err != nil {
+				klog.Errorf(err.Error())
+				return ctrl.Result{}, fmt.Errorf("reconcile job err: %s", err.Error())
+			}
+
+			return ctrl.Result{}, nil
+		default:
+			job.Status.State.Phase = appsv1alpha1.Terminating
+			job.Status.State.Message = "job deleting"
+			if err := r.updateJobStatus(context.Background(), job); err != nil {
+				klog.Errorf(err.Error())
+				return ctrl.Result{}, fmt.Errorf("reconcile job err: %s", err.Error())
+			}
+
+			return ctrl.Result{}, nil
+		}
+
 	}
 
 	// if job was new created, update status
@@ -109,217 +148,74 @@ func (r *JobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		job.Status.State.Message = "job scheduled"
 		job.Status.ItemStatus = map[string]appsv1alpha1.ItemStatus{}
 
-		if err := r.Client.Status().Update(context.Background(), job); err != nil {
-			klog.Errorf("add job to tree cache err: %s", err.Error())
-			return ctrl.Result{}, fmt.Errorf("reconcile get job err: %s", err.Error())
+		if err := r.updateJobStatus(context.Background(), job); err != nil {
+			klog.Errorf(err.Error())
+			return ctrl.Result{}, fmt.Errorf("reconcile job err: %s", err.Error())
 		}
 
 		return ctrl.Result{}, nil
 	}
 
-	// get status in cache and compare with one in k8s.
-	// If the result has diff, update status.
-	// todo
+	// job items' status
+	changed, err := r.Cache.syncJobItemStatus(job)
+	if err != nil {
+		klog.Errorf(err.Error())
+		return ctrl.Result{}, fmt.Errorf("reconcile job err: %s", err.Error())
+	}
+	if changed {
+		if err := r.updateJobStatus(context.Background(), job); err != nil {
+			klog.Errorf(err.Error())
+			return ctrl.Result{}, fmt.Errorf("reconcile job err: %s", err.Error())
+		}
+	}
+
+	// job finished
+	finished, failed, err := r.Cache.isJobFinished(job.Name)
+	if err != nil {
+		klog.Errorf(err.Error())
+		return ctrl.Result{}, fmt.Errorf("reconcile job err: %s", err.Error())
+	}
+	if finished {
+		switch job.Status.State.Phase {
+		case appsv1alpha1.Terminated, appsv1alpha1.Terminating, appsv1alpha1.Failed, appsv1alpha1.Completed:
+		case appsv1alpha1.Completing:
+			job.Status.State.Phase = appsv1alpha1.Completed
+			job.Status.State.Message = "job completed"
+
+			if err := r.updateJobStatus(context.Background(), job); err != nil {
+				klog.Errorf(err.Error())
+				return ctrl.Result{}, fmt.Errorf("reconcile job err: %s", err.Error())
+			}
+
+			return ctrl.Result{}, nil
+		default:
+			if failed {
+				job.Status.State.Phase = appsv1alpha1.Failed
+				job.Status.State.Message = "job failed"
+			} else {
+				job.Status.State.Phase = appsv1alpha1.Completing
+				job.Status.State.Message = "job completing"
+			}
+
+			if err := r.updateJobStatus(context.Background(), job); err != nil {
+				klog.Errorf(err.Error())
+				return ctrl.Result{}, fmt.Errorf("reconcile job err: %s", err.Error())
+			}
+
+			return ctrl.Result{}, nil
+		}
+	}
 
 	// if job was a scheduled one, schedule next items
 	if job.Status.State.Phase == appsv1alpha1.Scheduled {
-
-		schedulingItems, ok := Cache.getNextScheduleJobItem(job.Name)
-		if !ok {
-			klog.Errorf("create job item err: not find %s first item", job.Name)
+		if err := r.createJobItem(context.Background(), job); err != nil {
+			klog.Errorf(err.Error())
+			return ctrl.Result{}, fmt.Errorf("reconcile get job err: %s", err.Error())
 		}
-
-		for _, item := range schedulingItems {
-			if err := r.createJobItem(context.Background(), job, item); err != nil {
-				klog.Errorf("create job item err: %s", err.Error())
-				return ctrl.Result{}, fmt.Errorf("reconcile get job err: %s", err.Error())
-			}
-		}
-
 	}
 
 	return ctrl.Result{}, nil
 }
-
-func (r *JobReconciler) createJobItem(ctx context.Context, job *appsv1alpha1.Job, item *appsv1alpha1.Item) error {
-
-	job.Status.ItemStatus[item.Name] = appsv1alpha1.ItemStatus{
-		Name:  item.Name,
-		Phase: appsv1alpha1.ItemScheduling,
-	}
-
-	trueFlag := true
-	ownerReference := []metav1.OwnerReference{
-		{
-			APIVersion:         job.APIVersion,
-			Kind:               job.Kind,
-			Name:               job.Name,
-			UID:                job.UID,
-			Controller:         &trueFlag,
-			BlockOwnerDeletion: &trueFlag,
-		},
-	}
-
-	baseAnnotations := job.Annotations
-	baseAnnotations[CreateByJob] = job.Name
-	baseAnnotations[CreateByJobItem] = item.Name
-
-	baseLabels := job.Labels
-	baseLabels[CreateByJob] = job.Name
-	baseLabels[CreateByJobItem] = item.Name
-
-	expendAnnotationFn := func(extend map[string]string) map[string]string {
-		res := map[string]string{}
-
-		for k, v := range baseAnnotations {
-			res[k] = v
-		}
-
-		for k, v := range extend {
-			res[k] = v
-		}
-
-		return res
-	}
-
-	expendLabelFn := func(extend map[string]string) map[string]string {
-		res := map[string]string{}
-
-		for k, v := range baseLabels {
-			res[k] = v
-		}
-
-		for k, v := range extend {
-			res[k] = v
-		}
-
-		return res
-	}
-
-	var createdObj []client.Object
-
-	defer func() {
-		for _, obj := range createdObj {
-			if err := r.Delete(ctx, obj); err != nil {
-				klog.Errorf(err.Error())
-			}
-		}
-	}()
-
-	for _, itemJob := range item.ItemJobs.Jobs {
-		// todo container extend and node name apply
-
-		if itemJob.KubeJobSpec == nil && itemJob.VolcanoJobSpec == nil {
-			return fmt.Errorf("%s k8s itemJob and volcano itemJob can not be total nil", itemJob.Name)
-		}
-
-		if itemJob.KubeJobSpec != nil && itemJob.VolcanoJobSpec != nil {
-			return fmt.Errorf("%s k8s itemJob and volcano itemJob can not be total exists", itemJob.Name)
-		}
-
-		jobName := calItemSubName(job.Name, item.Name, itemJob.Name)
-		jobObjectMeta := metav1.ObjectMeta{
-			Name:            jobName,
-			OwnerReferences: ownerReference,
-			Annotations:     expendAnnotationFn(itemJob.Annotations),
-			Labels:          expendLabelFn(itemJob.Labels),
-		}
-
-		var job2Create client.Object
-		if itemJob.KubeJobSpec != nil {
-
-			job2Create = &v1.Job{
-				ObjectMeta: jobObjectMeta,
-				Spec:       *itemJob.KubeJobSpec,
-			}
-
-		} else if itemJob.VolcanoJobSpec != nil {
-
-			job2Create = &v1alpha1.Job{
-				ObjectMeta: jobObjectMeta,
-				Spec:       *itemJob.VolcanoJobSpec,
-			}
-
-		}
-
-		if err := r.Create(ctx, job2Create); err != nil {
-			return err
-		}
-
-		createdObj = append(createdObj, job2Create)
-
-	}
-
-	for _, service := range item.ItemModules.Services {
-
-		serviceName := calItemSubName(job.Name, item.Name, service.Name)
-
-		serviceObjectMeta := metav1.ObjectMeta{
-			Name:            serviceName,
-			OwnerReferences: ownerReference,
-			Annotations:     expendAnnotationFn(service.Annotations),
-			Labels:          expendLabelFn(service.Labels),
-		}
-
-		service2Create := &corev1.Service{
-			ObjectMeta: serviceObjectMeta,
-			Spec:       service.Spec,
-		}
-
-		if err := r.Create(ctx, service2Create); err != nil {
-			return err
-		}
-
-		createdObj = append(createdObj, service2Create)
-
-	}
-
-	for _, cm := range item.ItemModules.ConfigMaps {
-
-		cmName := calItemSubName(job.Name, item.Name, cm.ConfigMap.Name)
-
-		cmImpl := cm.ConfigMap.DeepCopy()
-
-		cmImpl.Labels = expendLabelFn(cm.ConfigMap.Labels)
-		cmImpl.Annotations = expendAnnotationFn(cm.ConfigMap.Annotations)
-		cmImpl.OwnerReferences = ownerReference
-		cmImpl.Name = cmName
-
-		if err := r.Create(ctx, cmImpl); err != nil {
-			return err
-		}
-
-		createdObj = append(createdObj, cmImpl)
-
-	}
-
-	for _, secret := range item.ItemModules.Secrets {
-
-		secretName := calItemSubName(job.Name, item.Name, secret.Secret.Name)
-
-		secretImpl := secret.Secret.DeepCopy()
-
-		secretImpl.Labels = expendLabelFn(secret.Secret.Labels)
-		secretImpl.Annotations = expendAnnotationFn(secret.Secret.Annotations)
-		secretImpl.OwnerReferences = ownerReference
-		secretImpl.Name = secretName
-
-		if err := r.Create(ctx, secretImpl); err != nil {
-			return err
-		}
-
-		createdObj = append(createdObj, secretImpl)
-
-	}
-
-	return nil
-
-}
-
-const (
-	CreateByJob     = "songf.sh/job"
-	CreateByJobItem = "songf.sh/job-item"
-)
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *JobReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -330,7 +226,7 @@ func (r *JobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}
 
 		annotations := obj.GetAnnotations()
-		_, ok := annotations[CreateByJob]
+		_, ok := annotations[appsv1alpha1.CreateByJob]
 		return ok
 	})
 
@@ -338,10 +234,12 @@ func (r *JobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&appsv1alpha1.Job{}).
 		WithEventFilter(filter).
 		WithEventFilter(predicate.ResourceVersionChangedPredicate{}).
-		Watches(&v1.Job{}, handler.EnqueueRequestsFromMapFunc(Cache.kubeJobHandler)).
-		Watches(&v1alpha1.Job{}, handler.EnqueueRequestsFromMapFunc(Cache.vcJobHandler)).
-		Watches(&corev1.Service{}, handler.EnqueueRequestsFromMapFunc(Cache.serviceHandler)).
-		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(Cache.configmapHandler)).
-		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(Cache.secretHandler)).
+		Watches(&v1.Job{}, handler.EnqueueRequestsFromMapFunc(r.Cache.kubeJobHandler)).
+		Watches(&v1alpha1.Job{}, handler.EnqueueRequestsFromMapFunc(r.Cache.vcJobHandler)).
+		Watches(&corev1.Service{}, handler.EnqueueRequestsFromMapFunc(r.Cache.serviceHandler)).
+		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(r.Cache.configmapHandler)).
+		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(r.Cache.secretHandler)).
+		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.Cache.pvcHandler)).
+		Watches(&corev1.PersistentVolume{}, handler.EnqueueRequestsFromMapFunc(r.Cache.pvHandler)).
 		Complete(r)
 }
